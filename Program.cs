@@ -17,6 +17,12 @@ namespace BOT_Greg_v2_API
                     AutomaticDecompression = System.Net.DecompressionMethods.GZip
                 });
 
+            builder.Services.AddHttpClient<VrsService>()
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    AutomaticDecompression = System.Net.DecompressionMethods.GZip
+                });
+
             var app = builder.Build();
 
 

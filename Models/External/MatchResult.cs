@@ -4,7 +4,7 @@
     {
         public int TeamXMapScore { get; init; }
         public int TeamYMapScore { get; init; }
-
+        public bool isForfeit { get; init; }
         public List<Map> Maps { get; init; } = null!;
     }
 

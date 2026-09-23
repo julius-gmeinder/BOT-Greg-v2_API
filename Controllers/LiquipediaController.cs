@@ -8,10 +8,12 @@ namespace BOT_Greg_v2_API.Controllers
     public class LiquipediaController : ControllerBase
     {
         private readonly LiquipediaService _liquipedia;
+        private readonly VrsService _vrs;
 
-        public LiquipediaController(LiquipediaService liquipedia)
+        public LiquipediaController(LiquipediaService liquipedia, VrsService vrs)
         {
             _liquipedia = liquipedia;
+            _vrs = vrs;
         }
 
         [HttpGet("matches")]
@@ -34,6 +36,12 @@ namespace BOT_Greg_v2_API.Controllers
         public async Task<IActionResult> GetTeamsAsync()
         {
             return Ok(await _liquipedia.GetTeamsAsync());
+        }
+
+        [HttpGet("valve-vrs")]
+        public async Task<IActionResult> GetValveVrsAsync()
+        {
+            return Ok(await _vrs.GetVrsTeamsAsync());
         }
     }
 }
