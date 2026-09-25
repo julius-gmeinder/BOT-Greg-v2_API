@@ -1,4 +1,6 @@
+using BOT_Greg_v2_API.Data;
 using BOT_Greg_v2_API.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace BOT_Greg_v2_API
 {
@@ -10,6 +12,14 @@ namespace BOT_Greg_v2_API
 
             builder.Services.AddControllers();
             builder.Services.AddSwaggerGen();
+
+            string connString = builder.Configuration.GetConnectionString("BotGregDb")!;
+            builder.Services.AddDbContextPool<BotGregDbContext>(options =>
+            {
+                options
+                    .UseLazyLoadingProxies()
+                    .UseMySql(connString, ServerVersion.AutoDetect(connString));
+            });
 
             builder.Services.AddHttpClient<LiquipediaService>()
                 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
@@ -24,7 +34,6 @@ namespace BOT_Greg_v2_API
                 });
 
             var app = builder.Build();
-
 
             if (app.Environment.IsDevelopment())
             {
