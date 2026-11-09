@@ -1,6 +1,7 @@
 using BOT_Greg_v2_API.Helpers;
 using BOT_Greg_v2_API.Models.Enums;
 using BOT_Greg_v2_API.Models.External;
+using Microsoft.Extensions.Caching.Memory;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Stream = BOT_Greg_v2_API.Models.External.Stream;
@@ -10,22 +11,52 @@ namespace BOT_Greg_v2_API.Services;
 public class LiquipediaService
 {
     private readonly HttpClient _httpClient;
-    private readonly ILogger<LiquipediaService> _logger;
     private readonly VrsService _vrs;
+    private readonly ILogger<LiquipediaService> _logger;
+    private readonly IMemoryCache _cache;
     private readonly string _apiKey;
 
-    public LiquipediaService(HttpClient httpClient, IConfiguration config, ILogger<LiquipediaService> logger, VrsService vrs)
+    private static readonly TimeSpan MatchesCacheTime = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan ResultsCacheTime = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan EventsCacheTime = TimeSpan.FromHours(24);
+    private static readonly TimeSpan TeamsCacheTime = TimeSpan.FromHours(24);
+
+    public LiquipediaService(HttpClient httpClient, IConfiguration config, ILogger<LiquipediaService> logger, VrsService vrs, IMemoryCache cache)
     {
         _httpClient = httpClient;
         _logger = logger;
         _vrs = vrs;
+        _cache = cache;
         _apiKey = config["ApiKeys:Liquipedia"]!;
 
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Apikey", _apiKey);
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("BOT-Greg-v2/1.0 (julius.gmeinder@proton.me)");
     }
 
-    public async Task<List<MatchUpcoming>> GetMatchesAsync()
+    public Task<List<MatchUpcoming>> GetMatchesAsync() => GetCachedAsync("lp_matches", MatchesCacheTime, FetchMatchesAsync);
+
+    public Task<List<MatchResult>> GetResultsAsync() => GetCachedAsync("lp_results", ResultsCacheTime, FetchResultsAsync);
+
+    public Task<List<Event>> GetEventsAsync() => GetCachedAsync("lp_events", EventsCacheTime, FetchEventsAsync);
+
+    public Task<List<Team>> GetTeamsAsync() => GetCachedAsync("lp_teams", TeamsCacheTime, FetchTeamsAsync);
+
+    private async Task<List<T>> GetCachedAsync<T>(string key, TimeSpan expiration, Func<Task<List<T>>> fetch)
+    {
+        if (_cache.TryGetValue(key, out List<T>? cached) && cached != null)
+            return cached;
+
+        var data = await fetch();
+
+        // empty most likely means the request failed, so fetch again next time instead of caching an empty list
+        if (data.Count > 0)
+            _cache.Set(key, data, expiration);
+
+        return data;
+    }
+
+
+    private async Task<List<MatchUpcoming>> FetchMatchesAsync()
     {
         List<MatchUpcoming> matches = new();
 
@@ -154,7 +185,7 @@ public class LiquipediaService
         return matches;
     }
 
-    public async Task<List<MatchResult>> GetResultsAsync()
+    private async Task<List<MatchResult>> FetchResultsAsync()
     {
         List<MatchResult> results = new();
 
@@ -338,7 +369,7 @@ public class LiquipediaService
         return results;
     }
 
-    public async Task<List<Event>> GetEventsAsync()
+    private async Task<List<Event>> FetchEventsAsync()
     {
         List<Event> events = new();
 
@@ -414,7 +445,7 @@ public class LiquipediaService
         return events;
     }
 
-    public async Task<List<Team>> GetTeamsAsync()
+    private async Task<List<Team>> FetchTeamsAsync()
     {
         List<Team> teams = new();
 

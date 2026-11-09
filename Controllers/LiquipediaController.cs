@@ -37,10 +37,4 @@ public class LiquipediaController : ControllerBase
     {
         return Ok(await _liquipedia.GetTeamsAsync());
     }
-
-    [HttpGet("valve-vrs")]
-    public async Task<IActionResult> GetValveVrsAsync()
-    {
-        return Ok(await _vrs.GetVrsTeamsAsync());
-    }
 }

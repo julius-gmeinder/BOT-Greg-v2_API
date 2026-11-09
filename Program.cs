@@ -12,6 +12,7 @@ public class Program
 
         builder.Services.AddControllers();
         builder.Services.AddSwaggerGen();
+        builder.Services.AddMemoryCache();
 
         string connString = builder.Configuration.GetConnectionString("BotGregDb")!;
         builder.Services.AddDbContextPool<BotGregDbContext>(options =>
