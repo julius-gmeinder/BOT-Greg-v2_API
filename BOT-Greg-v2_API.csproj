@@ -11,6 +11,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="BOT-Greg-v1_API\**" />
+    <Content Remove="BOT-Greg-v1_API\**" />
+    <EmbeddedResource Remove="BOT-Greg-v1_API\**" />
+    <None Remove="BOT-Greg-v1_API\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="9.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.0">

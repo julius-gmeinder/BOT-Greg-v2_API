@@ -11,6 +11,7 @@ namespace BOT_Greg_v2_API.Models.Enums
         C_Tier = 4,
     }
 }
+
 public static class StreamPlatformExtensions
 {
     public static string? GetString(this EventTier tier)
