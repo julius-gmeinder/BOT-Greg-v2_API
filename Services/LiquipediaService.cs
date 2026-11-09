@@ -11,12 +11,14 @@ public class LiquipediaService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<LiquipediaService> _logger;
+    private readonly VrsService _vrs;
     private readonly string _apiKey;
 
-    public LiquipediaService(HttpClient httpClient, IConfiguration config, ILogger<LiquipediaService> logger)
+    public LiquipediaService(HttpClient httpClient, IConfiguration config, ILogger<LiquipediaService> logger, VrsService vrs)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _vrs = vrs;
         _apiKey = config["ApiKeys:Liquipedia"]!;
 
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Apikey", _apiKey);
@@ -416,7 +418,29 @@ public class LiquipediaService
     {
         List<Team> teams = new();
 
-        string conditions = "[[status::active]]";
+        var vrsTeams = await _vrs.GetVrsTeamsAsync();
+
+        if (vrsTeams.Count == 0)
+            return teams;
+
+        var squads = await GetSquadPlayersAsync();
+        var vrsByPage = MatchSquadsToVrs(squads, vrsTeams);
+
+        // chunked to keep the url short
+        foreach (var pageNames in vrsByPage.Keys.Chunk(50))
+        {
+            teams.AddRange(await GetTeamsByPageNamesAsync(pageNames, vrsByPage));
+        }
+
+        return teams.OrderBy(t => t.Vrs?.Rank ?? int.MaxValue).ToList();
+    }
+
+    private async Task<List<Team>> GetTeamsByPageNamesAsync(string[] pageNames, Dictionary<string, TeamVrs> vrsByPage)
+    {
+        List<Team> teams = new();
+
+        string pageFilter = string.Join(" OR ", pageNames.Select(p => $"[[pagename::{p}]]"));
+        string conditions = $"[[status::active]] AND ({pageFilter})";
         string limit = "100";
 
         string url = $"{Constants.LpApiBaseUrl}/team?wiki=counterstrike&limit={limit}&conditions={Uri.EscapeDataString(conditions)}&order=name%20ASC";
@@ -459,16 +483,21 @@ public class LiquipediaService
                 }
             }
 
+            string lpRelativeUrl = element.GetProperty("pagename").GetString()!;
+            vrsByPage.TryGetValue(lpRelativeUrl, out var vrsTeam);
+
             Team team = new()
             {
                 TeamId = element.GetProperty("pageid").GetInt32(),
                 Name = element.GetProperty("name").GetString()!,
-                RelUrl = element.GetProperty("pagename").GetString()!,
+                RelUrl = lpRelativeUrl,
 
                 NameShort = element.TryGetProperty("shortname", out var snProp) ? snProp.GetString() : null,
 
                 Region = region,
-                Country = country
+                Country = country,
+
+                Vrs = vrsTeam
             };
 
             teams.Add(team);
@@ -477,4 +506,79 @@ public class LiquipediaService
         return teams;
     }
 
+    private async Task<Dictionary<string, HashSet<string>>> GetSquadPlayersAsync()
+    {
+        Dictionary<string, HashSet<string>> squads = new(StringComparer.OrdinalIgnoreCase);
+
+        const int limit = 1000; // max page size of the liquipedia api
+        string conditions = "[[type::player]] AND [[status::active]]";
+
+        for (int offset = 0; ; offset += limit)
+        {
+            string url = $"{Constants.LpApiBaseUrl}/squadplayer?wiki=counterstrike&query=pagename,id&limit={limit}&offset={offset}&conditions={Uri.EscapeDataString(conditions)}&order=pagename%20ASC,id%20ASC";
+
+            var response = await _httpClient.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError($"Fetching squad players failed: {response.StatusCode} - {response.ReasonPhrase}");
+                break;
+            }
+
+            var data = await response.Content.ReadAsStringAsync();
+            using JsonDocument json = JsonDocument.Parse(data);
+
+            int count = 0;
+
+            foreach (var element in json.RootElement.GetProperty("result").EnumerateArray())
+            {
+                count++;
+
+                string? pageName = element.GetProperty("pagename").GetString();
+                string? player = element.GetProperty("id").GetString();
+
+                if (string.IsNullOrWhiteSpace(pageName) || string.IsNullOrWhiteSpace(player))
+                    continue;
+
+                if (!squads.ContainsKey(pageName))
+                    squads[pageName] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                squads[pageName].Add(player.Trim());
+            }
+
+            if (count < limit)
+                break;
+        }
+
+        return squads;
+    }
+
+    private Dictionary<string, TeamVrs> MatchSquadsToVrs(Dictionary<string, HashSet<string>> squads, List<TeamVrs> vrsTeams)
+    {
+        Dictionary<string, TeamVrs> matches = new(StringComparer.OrdinalIgnoreCase);
+        int minOverlap = 3;
+
+        foreach (var vrsTeam in vrsTeams)
+        {
+            string? bestPage = null;
+            int bestOverlap = 0;
+
+            foreach (var (page, players) in squads)
+            {
+                int overlap = vrsTeam.Players.Count(players.Contains);
+
+                if (overlap >= minOverlap && overlap > bestOverlap)
+                {
+                    bestPage = page;
+                    bestOverlap = overlap;
+                }
+            }
+
+            // vrs teams are ordered by rank, so the better ranked team keeps the page
+            if (bestPage != null)
+                matches.TryAdd(bestPage, vrsTeam);
+        }
+
+        return matches;
+    }
 }

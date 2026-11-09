@@ -13,4 +13,6 @@ public class Team
     public string? Region { get; init; }
 
     public string LocationString => Country ?? Region ?? string.Empty;
+
+    public TeamVrs? Vrs { get; init; } = null;
 }
