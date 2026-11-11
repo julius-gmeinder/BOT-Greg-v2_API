@@ -25,11 +25,65 @@ namespace BOT_Greg_v2_API.Data.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.FilterMatRes", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Event")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<int?>("EventTier")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("GuildId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool?>("HltvCoverage")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("RoleId")
+                        .IsRequired()
+                        .HasMaxLength(22)
+                        .HasColumnType("varchar(22)");
+
+                    b.Property<string>("Team")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("VrsRank")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuildId");
+
+                    b.ToTable("FiltersMatRes");
+                });
+
             modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.Guild", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
+
+                    b.Property<string>("AlertRoleId")
+                        .HasMaxLength(22)
+                        .HasColumnType("varchar(22)");
+
+                    b.Property<bool>("AlertsPaused")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("CensorResults")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
@@ -46,6 +100,20 @@ namespace BOT_Greg_v2_API.Data.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("MatchAlertsChannelId")
+                        .HasMaxLength(22)
+                        .HasColumnType("varchar(22)");
+
+                    b.Property<bool>("MentionOnDelays")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("MentionOnResults")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("ResultAlertsChannelId")
+                        .HasMaxLength(22)
+                        .HasColumnType("varchar(22)");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -55,6 +123,126 @@ namespace BOT_Greg_v2_API.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Guilds");
+                });
+
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.HistoryMatchAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("AlertsSent")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("DateTime")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("MatchId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MatchId")
+                        .IsUnique();
+
+                    b.ToTable("HistoryMatchAlerts");
+                });
+
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.HistoryResultAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("AlertsSent")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("MatchId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MatchId")
+                        .IsUnique();
+
+                    b.ToTable("HistoryResultAlerts");
+                });
+
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.RoleLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("BotRoleId")
+                        .IsRequired()
+                        .HasMaxLength(22)
+                        .HasColumnType("varchar(22)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("GuildId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("LinkedRoleId")
+                        .IsRequired()
+                        .HasMaxLength(22)
+                        .HasColumnType("varchar(22)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuildId");
+
+                    b.ToTable("RoleLinks");
+                });
+
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.FilterMatRes", b =>
+                {
+                    b.HasOne("BOT_Greg_v2_API.Models.Entities.Guild", "Guild")
+                        .WithMany("FiltersMatRes")
+                        .HasForeignKey("GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Guild");
+                });
+
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.RoleLink", b =>
+                {
+                    b.HasOne("BOT_Greg_v2_API.Models.Entities.Guild", "Guild")
+                        .WithMany("RoleLinks")
+                        .HasForeignKey("GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Guild");
+                });
+
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.Guild", b =>
+                {
+                    b.Navigation("FiltersMatRes");
+
+                    b.Navigation("RoleLinks");
                 });
 #pragma warning restore 612, 618
         }

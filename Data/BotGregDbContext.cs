@@ -11,6 +11,10 @@ public class BotGregDbContext : DbContext
     }
 
     public DbSet<Guild> Guilds { get; set; }
+    public DbSet<Filter> FiltersMatRes { get; set; }
+    public DbSet<RoleLink> RoleLinks { get; set; }
+    public DbSet<HistoryMatchAlert> HistoryMatchAlerts { get; set; }
+    public DbSet<HistoryResultAlert> HistoryResultAlerts { get; set; }
 
     public override int SaveChanges()
     {

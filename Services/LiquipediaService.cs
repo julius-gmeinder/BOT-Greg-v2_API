@@ -16,8 +16,8 @@ public class LiquipediaService
     private readonly IMemoryCache _cache;
     private readonly string _apiKey;
 
-    private static readonly TimeSpan MatchesCacheTime = TimeSpan.FromMinutes(3);
-    private static readonly TimeSpan ResultsCacheTime = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan MatchesCacheTime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ResultsCacheTime = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan EventsCacheTime = TimeSpan.FromHours(24);
     private static readonly TimeSpan TeamsCacheTime = TimeSpan.FromHours(24);
 
@@ -33,17 +33,18 @@ public class LiquipediaService
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("BOT-Greg-v2/1.0 (julius.gmeinder@proton.me)");
     }
 
-    public Task<List<MatchUpcoming>> GetMatchesAsync() => GetCachedAsync("lp_matches", MatchesCacheTime, FetchMatchesAsync);
+    // refetch = true skips the cache and fetches the newest data (which then replaces the cached data)
+    public Task<List<MatchUpcoming>> GetMatchesAsync(bool refetch = false) => GetCachedAsync("lp_matches", MatchesCacheTime, FetchMatchesAsync, refetch);
 
-    public Task<List<MatchResult>> GetResultsAsync() => GetCachedAsync("lp_results", ResultsCacheTime, FetchResultsAsync);
+    public Task<List<MatchResult>> GetResultsAsync(bool refetch = false) => GetCachedAsync("lp_results", ResultsCacheTime, FetchResultsAsync, refetch);
 
-    public Task<List<Event>> GetEventsAsync() => GetCachedAsync("lp_events", EventsCacheTime, FetchEventsAsync);
+    public Task<List<Event>> GetEventsAsync(bool refetch = false) => GetCachedAsync("lp_events", EventsCacheTime, FetchEventsAsync, refetch);
 
-    public Task<List<Team>> GetTeamsAsync() => GetCachedAsync("lp_teams", TeamsCacheTime, FetchTeamsAsync);
+    public Task<List<Team>> GetTeamsAsync(bool refetch = false) => GetCachedAsync("lp_teams", TeamsCacheTime, FetchTeamsAsync, refetch);
 
-    private async Task<List<T>> GetCachedAsync<T>(string key, TimeSpan expiration, Func<Task<List<T>>> fetch)
+    private async Task<List<T>> GetCachedAsync<T>(string key, TimeSpan expiration, Func<Task<List<T>>> fetch, bool refetch)
     {
-        if (_cache.TryGetValue(key, out List<T>? cached) && cached != null)
+        if (!refetch && _cache.TryGetValue(key, out List<T>? cached) && cached != null)
             return cached;
 
         var data = await fetch();
@@ -207,7 +208,7 @@ public class LiquipediaService
 
         var data = await response.Content.ReadAsStringAsync();
         using JsonDocument json = JsonDocument.Parse(data);
-        JsonTools.LogJson(json);
+        //JsonTools.LogJson(json);
 
         var resultNode = json.RootElement.GetProperty("result");
 

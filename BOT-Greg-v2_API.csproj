@@ -32,9 +32,7 @@
 
   <ItemGroup>
     <Folder Include="Middleware\" />
-    <Folder Include="Models\DTOs\" />
     <Folder Include="Models\Filters\" />
-    <Folder Include="Repos\" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,7 @@
 using BOT_Greg_v2_API.Data;
+using BOT_Greg_v2_API.Repos;
 using BOT_Greg_v2_API.Services;
+using BOT_Greg_v2_API.Services.Alerts;
 using Microsoft.EntityFrameworkCore;
 
 namespace BOT_Greg_v2_API;
@@ -33,6 +35,27 @@ public class Program
             {
                 AutomaticDecompression = System.Net.DecompressionMethods.GZip
             });
+
+        // Repos
+        builder.Services.AddScoped<GuildsRepo>();
+        builder.Services.AddScoped<RolesRepo>();
+        builder.Services.AddScoped<AlertsRepo>();
+        builder.Services.AddScoped<FiltersRepo>();
+        builder.Services.AddScoped<RoleLinksRepo>();
+        builder.Services.AddScoped<HistoryMatchAlertsRepo>();
+        builder.Services.AddScoped<HistoryResultAlertsRepo>();
+        builder.Services.AddScoped<AutocompleteRepo>();
+
+        // Alerts
+        builder.Services.AddSingleton<AlertStreamService>();
+        builder.Services.AddScoped<AlertsHelper>();
+        builder.Services.AddScoped<MatchAlertsService>();
+        builder.Services.AddScoped<MatchDelaysService>();
+        builder.Services.AddScoped<ResultAlertsService>();
+
+        // Backgroundworker
+        builder.Services.AddHostedService<BackgroundWorker>();
+        builder.Services.AddHostedService<AlertStreamHeartbeat>();
 
         var app = builder.Build();
 

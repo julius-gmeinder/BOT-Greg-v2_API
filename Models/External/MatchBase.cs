@@ -1,4 +1,6 @@
-﻿namespace BOT_Greg_v2_API.Models.External;
+﻿using BOT_Greg_v2_API.Models.Enums;
+
+namespace BOT_Greg_v2_API.Models.External;
 
 public class MatchBase
 {
@@ -18,9 +20,12 @@ public class MatchBase
     
     public string LpTier { get; init; } = null!;
     public string ValveTier { get; init; } = null!;
+    public EventTier? Tier => EventTierExtensions.FromLiquipedia(LpTier, ValveTier);
+    public string? TierString => Tier?.GetString();
 
     public string? HltvUrl { get; init; } = null;
     public string? FaceitUrl { get; init; } = null;
+    public bool IsHltvCovered => HltvUrl != null;
 
     public MatchTeam? TeamX { get; init; } = null!;
     public MatchTeam? TeamY { get; init; } = null!;
