@@ -19,9 +19,9 @@ public class GuildsRepo
         return await _db.Guilds.ToListAsync();
     }
 
-    public async Task<Guild?> GetGuildAsync(string guildId)
+    public async Task<Guild?> GetGuildAsync(string guildDiscordId)
     {
-        return await _db.Guilds.FirstOrDefaultAsync(x => x.GuildId == guildId);
+        return await _db.Guilds.FirstOrDefaultAsync(x => x.DiscordId == guildDiscordId);
     }
 
     public async Task AddGuildAsync(GuildDataDto guildDto)
@@ -32,7 +32,7 @@ public class GuildsRepo
 
     public async Task RemoveGuildAsync(Guild guild)
     {
-        // filters and role links are removed by the database (cascade delete)
+        // settings, filters and role links are removed by the database (cascade delete)
         _db.Guilds.Remove(guild);
         await _db.SaveChangesAsync();
     }
@@ -42,17 +42,17 @@ public class GuildsRepo
         _db.Filters.RemoveRange(guild.Filters.ToList());
         _db.RoleLinks.RemoveRange(guild.RoleLinks.ToList());
 
-        guild.AlertRoleId = null;
+        guild.AlertRoleDiscordId = null;
 
         // alerts
-        guild.MatchAlertsChannelId = null;
-        guild.ResultAlertsChannelId = null;
+        guild.MatchAlertsChannelDiscordId = null;
+        guild.ResultAlertsChannelDiscordId = null;
 
         // settings
-        guild.AlertsPaused = false;
-        guild.MentionOnDelays = false;
-        guild.MentionOnResults = true;
-        guild.CensorResults = false;
+        guild.Settings.AlertsPaused = false;
+        guild.Settings.MentionOnDelays = false;
+        guild.Settings.MentionOnResults = true;
+        guild.Settings.CensorResults = false;
 
         await _db.SaveChangesAsync();
     }
@@ -62,12 +62,12 @@ public class GuildsRepo
     {
         List<GuildDataDto> guildsAdded = new();
 
-        var guildsInDb = (await GetGuildsAsync()).ToDictionary(x => x.GuildId);
+        var guildsInDb = (await GetGuildsAsync()).ToDictionary(x => x.DiscordId);
 
-        foreach (var guildDto in allGuilds.DistinctBy(x => x.GuildId))
+        foreach (var guildDto in allGuilds.DistinctBy(x => x.GuildDiscordId))
         {
             // .Remove() returns true if the guild was in the dictionary, so only the guilds to delete are left over at the end
-            if (guildsInDb.Remove(guildDto.GuildId, out var existingGuild))
+            if (guildsInDb.Remove(guildDto.GuildDiscordId, out var existingGuild))
             {
                 existingGuild.GuildName = guildDto.GuildName;
                 existingGuild.GuildMemberCount = guildDto.GuildMemberCount;
@@ -89,20 +89,20 @@ public class GuildsRepo
     {
         return new AlertConfigDto()
         {
-            MatchAlertChannelId = guild.MatchAlertsChannelId,
-            ResultAlertChannelId = guild.ResultAlertsChannelId,
-            AlertRoleId = guild.AlertRoleId
+            MatchAlertChannelDiscordId = guild.MatchAlertsChannelDiscordId,
+            ResultAlertChannelDiscordId = guild.ResultAlertsChannelDiscordId,
+            AlertRoleDiscordId = guild.AlertRoleDiscordId
         };
     }
 
     public async Task<AlertConfigDto> SetGuildsConfigAsync(Guild guild, AlertConfigDto configDto)
     {
-        guild.MatchAlertsChannelId = configDto.MatchAlertChannelId;
-        guild.ResultAlertsChannelId = configDto.ResultAlertChannelId;
+        guild.MatchAlertsChannelDiscordId = configDto.MatchAlertChannelDiscordId;
+        guild.ResultAlertsChannelDiscordId = configDto.ResultAlertChannelDiscordId;
 
         // the alert role can only be replaced, not removed
-        if (configDto.AlertRoleId != null)
-            guild.AlertRoleId = configDto.AlertRoleId;
+        if (configDto.AlertRoleDiscordId != null)
+            guild.AlertRoleDiscordId = configDto.AlertRoleDiscordId;
 
         await _db.SaveChangesAsync();
         return GetGuildsConfig(guild);
@@ -112,9 +112,10 @@ public class GuildsRepo
     {
         return new Guild()
         {
-            GuildId = guildDto.GuildId,
+            DiscordId = guildDto.GuildDiscordId,
             GuildName = guildDto.GuildName,
             GuildMemberCount = guildDto.GuildMemberCount,
+            Settings = new GuildSettings()
         };
     }
 }

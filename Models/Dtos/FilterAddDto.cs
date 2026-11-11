@@ -6,10 +6,10 @@ namespace BOT_Greg_v2_API.Models.Dtos;
 public class FilterAddDto
 {
     [Required]
-    public string GuildId { get; set; } = null!;
+    public string GuildDiscordId { get; set; } = null!;
 
     [Required, MaxLength(22)]
-    public string RoleId { get; set; } = null!;
+    public string RoleDiscordId { get; set; } = null!;
 
     [MaxLength(64)]
     public string? Team { get; set; } = null;

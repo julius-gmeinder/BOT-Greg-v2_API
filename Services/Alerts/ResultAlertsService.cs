@@ -47,10 +47,10 @@ public class ResultAlertsService
 
                 resultAlert.Guilds.Add(new ResultAlertDto.GuildData()
                 {
-                    ChannelId = guild.ResultAlertsChannelId!,
-                    MentionOnResults = guild.MentionOnResults,
-                    CensorResults = guild.CensorResults,
-                    RoleIds = rolesToPing
+                    ChannelDiscordId = guild.ResultAlertsChannelDiscordId!,
+                    MentionOnResults = guild.Settings.MentionOnResults,
+                    CensorResults = guild.Settings.CensorResults,
+                    RoleDiscordIds = rolesToPing
                 });
             }
 

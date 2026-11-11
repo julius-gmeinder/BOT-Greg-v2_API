@@ -5,11 +5,11 @@ namespace BOT_Greg_v2_API.Models.Dtos;
 public class AlertConfigDto
 {
     [MaxLength(22)]
-    public string? MatchAlertChannelId { get; set; } = null;
+    public string? MatchAlertChannelDiscordId { get; set; } = null;
 
     [MaxLength(22)]
-    public string? ResultAlertChannelId { get; set; } = null;
+    public string? ResultAlertChannelDiscordId { get; set; } = null;
 
     [MaxLength(22)]
-    public string? AlertRoleId { get; set; } = null;
+    public string? AlertRoleDiscordId { get; set; } = null;
 }

@@ -11,6 +11,7 @@ public class BotGregDbContext : DbContext
     }
 
     public DbSet<Guild> Guilds { get; set; }
+    public DbSet<GuildSettings> GuildSettings { get; set; }
     public DbSet<Filter> Filters { get; set; }
     public DbSet<RoleLink> RoleLinks { get; set; }
     public DbSet<HistoryMatchAlert> HistoryMatchAlerts { get; set; }

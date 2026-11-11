@@ -14,9 +14,9 @@ public class FiltersRepo
         _db = db;
     }
 
-    public async Task<List<Filter>> GetFiltersAsync(string guildId)
+    public async Task<List<Filter>> GetFiltersAsync(string guildDiscordId)
     {
-        return await _db.Filters.Where(x => x.Guild.GuildId == guildId).OrderBy(x => x.CreatedAt).ToListAsync();
+        return await _db.Filters.Where(x => x.Guild.DiscordId == guildDiscordId).OrderBy(x => x.CreatedAt).ToListAsync();
     }
 
     public async Task AddFilterAsync(Guild guild, FilterAddDto filterDto)
@@ -28,7 +28,7 @@ public class FiltersRepo
             EventTier = filterDto.EventTier,
             VrsRank = filterDto.VrsRank,
             HltvCoverage = filterDto.HltvCoverage,
-            RoleId = filterDto.RoleId,
+            RoleDiscordId = filterDto.RoleDiscordId,
             Guild = guild
         });
 
@@ -38,14 +38,14 @@ public class FiltersRepo
     public async Task<List<string>> RemoveFiltersAsync(FilterDeleteDto filterDto)
     {
         var filters = await _db.Filters
-            .Where(x => x.Guild.GuildId == filterDto.GuildId && filterDto.RoleIds.Contains(x.RoleId))
+            .Where(x => x.Guild.DiscordId == filterDto.GuildDiscordId && filterDto.RoleDiscordIds.Contains(x.RoleDiscordId))
             .ToListAsync();
 
-        var roleIdsToDelete = filters.Select(x => x.RoleId).ToList();
+        var roleDiscordIdsToDelete = filters.Select(x => x.RoleDiscordId).ToList();
 
         // the roles get deleted, so their links would point to nothing
         var roleLinks = await _db.RoleLinks
-            .Where(x => x.Guild.GuildId == filterDto.GuildId && roleIdsToDelete.Contains(x.BotRoleId))
+            .Where(x => x.Guild.DiscordId == filterDto.GuildDiscordId && roleDiscordIdsToDelete.Contains(x.BotRoleDiscordId))
             .ToListAsync();
 
         _db.Filters.RemoveRange(filters);
@@ -53,6 +53,6 @@ public class FiltersRepo
 
         await _db.SaveChangesAsync();
 
-        return roleIdsToDelete;
+        return roleDiscordIdsToDelete;
     }
 }

@@ -47,8 +47,8 @@ public class MatchAlertsService
 
                 matchAlert.Guilds.Add(new MatchAlertDto.GuildData()
                 {
-                    ChannelId = guild.MatchAlertsChannelId!,
-                    RoleIds = rolesToPing
+                    ChannelDiscordId = guild.MatchAlertsChannelDiscordId!,
+                    RoleDiscordIds = rolesToPing
                 });
             }
 

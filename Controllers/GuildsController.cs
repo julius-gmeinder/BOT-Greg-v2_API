@@ -20,7 +20,7 @@ public class GuildsController : ControllerBase
     [HttpPost("")]
     public async Task<IActionResult> AddAsync([FromBody] GuildDataDto guildDto)
     {
-        var existingGuild = await _guilds.GetGuildAsync(guildDto.GuildId);
+        var existingGuild = await _guilds.GetGuildAsync(guildDto.GuildDiscordId);
         if (existingGuild != null)
             return Conflict();
 
@@ -29,9 +29,9 @@ public class GuildsController : ControllerBase
     }
 
     [HttpDelete("")]
-    public async Task<IActionResult> DeleteAsync([FromQuery] string guildId)
+    public async Task<IActionResult> DeleteAsync([FromQuery] string guildDiscordId)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return NotFound();
 
@@ -40,13 +40,13 @@ public class GuildsController : ControllerBase
     }
 
     [HttpPut("reset")]
-    public async Task<IActionResult> ResetAsync([FromQuery] string guildId)
+    public async Task<IActionResult> ResetAsync([FromQuery] string guildDiscordId)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return NotFound();
 
-        var rolesToDelete = _roles.GetAllRoleIds(guild);
+        var rolesToDelete = _roles.GetAllRoleDiscordIds(guild);
 
         await _guilds.ResetGuildAsync(guild);
 

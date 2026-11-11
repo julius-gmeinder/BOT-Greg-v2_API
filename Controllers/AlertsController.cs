@@ -28,9 +28,9 @@ public class AlertsController : ControllerBase
     }
 
     [HttpGet("config")]
-    public async Task<IActionResult> GetGuildsConfigAsync([FromQuery] string guildId)
+    public async Task<IActionResult> GetGuildsConfigAsync([FromQuery] string guildDiscordId)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return NotFound();
 
@@ -38,9 +38,9 @@ public class AlertsController : ControllerBase
     }
 
     [HttpPost("config")]
-    public async Task<IActionResult> SetGuildsConfigAsync([FromQuery] string guildId, [FromBody] AlertConfigDto configDto)
+    public async Task<IActionResult> SetGuildsConfigAsync([FromQuery] string guildDiscordId, [FromBody] AlertConfigDto configDto)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return NotFound();
 

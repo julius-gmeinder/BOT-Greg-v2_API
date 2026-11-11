@@ -2,6 +2,6 @@
 
 public class RoleLinksTreeItemDto
 {
-    public string BotRoleId { get; set; } = null!;
-    public List<string> LinkedRoleIds { get; set; } = new();
+    public string BotRoleDiscordId { get; set; } = null!;
+    public List<string> LinkedRoleDiscordIds { get; set; } = new();
 }

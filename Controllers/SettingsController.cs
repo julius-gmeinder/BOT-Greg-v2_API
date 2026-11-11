@@ -22,38 +22,38 @@ public class SettingsController : ControllerBase
     [HttpPatch("ToggleMentionOnDelays")]
     public async Task<IActionResult> ToggleMentionOnDelaysAsync([FromBody] ToggleSettingDto toggleDto)
     {
-        return await ToggleSettingAsync(toggleDto, guild => guild.MentionOnDelays, (guild, value) => guild.MentionOnDelays = value);
+        return await ToggleSettingAsync(toggleDto, settings => settings.MentionOnDelays, (settings, value) => settings.MentionOnDelays = value);
     }
 
     [HttpPatch("ToggleMentionOnResults")]
     public async Task<IActionResult> ToggleMentionOnResultsAsync([FromBody] ToggleSettingDto toggleDto)
     {
-        return await ToggleSettingAsync(toggleDto, guild => guild.MentionOnResults, (guild, value) => guild.MentionOnResults = value);
+        return await ToggleSettingAsync(toggleDto, settings => settings.MentionOnResults, (settings, value) => settings.MentionOnResults = value);
     }
 
     [HttpPatch("ToggleCensorResults")]
     public async Task<IActionResult> ToggleCensorResultsAsync([FromBody] ToggleSettingDto toggleDto)
     {
-        return await ToggleSettingAsync(toggleDto, guild => guild.CensorResults, (guild, value) => guild.CensorResults = value);
+        return await ToggleSettingAsync(toggleDto, settings => settings.CensorResults, (settings, value) => settings.CensorResults = value);
     }
 
     [HttpPatch("TogglePauseAlerts")]
     public async Task<IActionResult> TogglePauseAlertsAsync([FromBody] ToggleSettingDto toggleDto)
     {
-        return await ToggleSettingAsync(toggleDto, guild => guild.AlertsPaused, (guild, value) => guild.AlertsPaused = value);
+        return await ToggleSettingAsync(toggleDto, settings => settings.AlertsPaused, (settings, value) => settings.AlertsPaused = value);
     }
 
-    // all settings are toggled the same way, they only differ in the property of the guild that is read and set
-    private async Task<IActionResult> ToggleSettingAsync(ToggleSettingDto toggleDto, Func<Guild, bool> getSetting, Action<Guild, bool> setSetting)
+    // all settings are toggled the same way, they only differ in the property of the guild settings that is read and set
+    private async Task<IActionResult> ToggleSettingAsync(ToggleSettingDto toggleDto, Func<GuildSettings, bool> getSetting, Action<GuildSettings, bool> setSetting)
     {
-        var guild = await _guilds.GetGuildAsync(toggleDto.GuildId);
+        var guild = await _guilds.GetGuildAsync(toggleDto.GuildDiscordId);
         if (guild == null)
             return NotFound();
 
-        if (toggleDto.NewValue == getSetting(guild))
+        if (toggleDto.NewValue == getSetting(guild.Settings))
             return Conflict();
 
-        setSetting(guild, toggleDto.NewValue);
+        setSetting(guild.Settings, toggleDto.NewValue);
         await _db.SaveChangesAsync();
         return NoContent();
     }

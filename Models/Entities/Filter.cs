@@ -19,7 +19,7 @@ public class Filter : BaseEntity
     public bool? HltvCoverage { get; set; } = null;
 
     [Required, MaxLength(22)]
-    public string RoleId { get; set; } = null!;
+    public string RoleDiscordId { get; set; } = null!;
 
     [Required]
     public virtual Guild Guild { get; set; } = null!;

@@ -9,6 +9,7 @@ Everything the bot frontend has to adapt to. Internal changes that the bot does 
 3. Adapt to the new match / result objects (Liquipedia instead of HLTV).
 4. Filters: `stars` is gone, `eventTier` is a number now, `hltvCoverage` is new.
 5. Guilds without filters only get HLTV-covered matches (default filter).
+6. All Discord ids got renamed to `...DiscordId` in request bodies, query parameters and responses (`guildId` -> `guildDiscordId`, `roleId` -> `roleDiscordId`, ...), see section 4.
 
 ---
 
@@ -95,26 +96,45 @@ The tier of a match is null if Liquipedia uses a tier outside of this list.
 
 ### Alert events
 
-Only `match` / `result` changed, the `guilds` array is the same as before:
+Besides `match` / `result`, only the id names in the `guilds` array changed (`channelId` -> `channelDiscordId`, `roleIds` -> `roleDiscordIds`):
 
 ```jsonc
 // matchAlerts
-[{ "match": { ... }, "guilds": [{ "channelId": "...", "roleIds": ["..."] }] }]
+[{ "match": { ... }, "guilds": [{ "channelDiscordId": "...", "roleDiscordIds": ["..."] }] }]
 
 // matchDelays, match.dateTime is the new start time
-[{ "match": { ... }, "guilds": [{ "channelId": "...", "mentionOnDelays": false, "roleIds": ["..."] }] }]
+[{ "match": { ... }, "guilds": [{ "channelDiscordId": "...", "mentionOnDelays": false, "roleDiscordIds": ["..."] }] }]
 
 // resultAlerts
-[{ "result": { ... }, "guilds": [{ "channelId": "...", "mentionOnResults": true, "censorResults": false, "roleIds": ["..."] }] }]
+[{ "result": { ... }, "guilds": [{ "channelDiscordId": "...", "mentionOnResults": true, "censorResults": false, "roleDiscordIds": ["..."] }] }]
 ```
 
-`roleIds` no longer contains duplicates.
+`roleDiscordIds` no longer contains duplicates.
 
 ---
 
 ## 4. Endpoints
 
 Routes, methods and status codes are the same as in v1 unless listed here.
+
+### Discord ids renamed
+
+Every Discord id is called `...DiscordId` now, so it can't be mixed up with the internal ids of the database. This affects request bodies, query parameters and responses of all endpoints and the alert events. The old names are no longer accepted (a missing `guildDiscordId` query parameter returns `400`).
+
+| v1 | v2 | Where |
+|---|---|---|
+| `guildId` | `guildDiscordId` | query parameter of every endpoint that takes a guild, bodies of `api/Guilds` (+ `sync`), `api/Filters`, `api/RoleLinks`, `api/Settings/*` |
+| `roleId` | `roleDiscordId` | filters (`GET` / `POST api/Filters`) |
+| `roleIds` | `roleDiscordIds` | body of `DELETE api/Filters`, `guilds` of the alert events |
+| `botRoleId` | `botRoleDiscordId` | bodies of `POST` / `DELETE api/RoleLinks`, query parameter of `GET api/RoleLinks/linked`, `GET api/RoleLinks/tree` |
+| `linkedRoleId` | `linkedRoleDiscordId` | bodies of `POST` / `DELETE api/RoleLinks` |
+| `linkedRoleIds` | `linkedRoleDiscordIds` | `GET api/RoleLinks/tree` |
+| `alertRoleId` | `alertRoleDiscordId` | alert config (`GET` / `POST api/Alerts/config`) |
+| `matchAlertChannelId` | `matchAlertChannelDiscordId` | alert config |
+| `resultAlertChannelId` | `resultAlertChannelDiscordId` | alert config |
+| `channelId` | `channelDiscordId` | `guilds` of the alert events |
+
+The tables below already use the new names.
 
 ### Alerts
 
@@ -128,8 +148,8 @@ Routes, methods and status codes are the same as in v1 unless listed here.
 
 | Endpoint | Change |
 |---|---|
-| `GET api/Filters` | filter: `{ nr, roleId, team, event, eventTier, eventTierString, vrsRank, hltvCoverage }` |
-| `POST api/Filters` | body: `{ guildId, roleId, team?, event?, eventTier?, vrsRank?, hltvCoverage? }` |
+| `GET api/Filters` | filter: `{ nr, roleDiscordId, team, event, eventTier, eventTierString, vrsRank, hltvCoverage }` |
+| `POST api/Filters` | body: `{ guildDiscordId, roleDiscordId, team?, event?, eventTier?, vrsRank?, hltvCoverage? }` |
 
 - `stars` removed.
 - `eventTier` is a number (`0` - `4`) instead of a string. The match has to be in this tier or above.
@@ -154,23 +174,23 @@ Routes, methods and status codes are the same as in v1 unless listed here.
 
 | Endpoint | Change |
 |---|---|
-| `POST api/Guilds`, `POST api/Guilds/sync` | guild data: `{ guildId, guildName, guildMemberCount }` (no `guildOwner`) |
+| `POST api/Guilds`, `POST api/Guilds/sync` | guild data: `{ guildDiscordId, guildName, guildMemberCount }` (no `guildOwner`) |
 
 ### RoleLinks
 
 | Endpoint | Change |
 |---|---|
-| `POST api/RoleLinks` | `botRoleId` has to be a bot role of the given guild (alert role or filter role), otherwise `404`. v1 accepted bot roles of any guild |
+| `POST api/RoleLinks` | `botRoleDiscordId` has to be a bot role of the given guild (alert role or filter role), otherwise `404`. v1 accepted bot roles of any guild |
 
 ### Settings
 
-`ToggleMentionOnDelays`, `ToggleMentionOnResults`, `ToggleCensorResults` and `TogglePauseAlerts` are unchanged. The two news toggles are removed.
+`ToggleMentionOnDelays`, `ToggleMentionOnResults`, `ToggleCensorResults` and `TogglePauseAlerts` are unchanged. The two news toggles are removed. (The settings are stored in their own table now, see section 6, the bot does not notice that.)
 
 ---
 
 ## 5. Changed behavior
 
-- **Default filter:** Liquipedia covers a lot more matches than HLTV. Guilds without filters got every match in v1, in v2 they only get matches and results that are covered by HLTV (`isHltvCovered`). As soon as a guild has at least one filter, only its own filters count. A filter without any property (only `roleId`) matches everything.
+- **Default filter:** Liquipedia covers a lot more matches than HLTV. Guilds without filters got every match in v1, in v2 they only get matches and results that are covered by HLTV (`isHltvCovered`). As soon as a guild has at least one filter, only its own filters count. A filter without any property (only `roleDiscordId`) matches everything.
 - **Linked roles:** roles linked to the alert role are pinged for guilds without filters too (v1 only added them if the guild had filters).
 - **Match alerts:** sent for matches that start within the next 5 minutes, once per match.
 - **Match delays:** sent when an already alerted match is upcoming again with a different start time. v1 only looked at the next 6 hours, v2 looks at all fetched matches (next 25 hours).
@@ -183,12 +203,14 @@ Routes, methods and status codes are the same as in v1 unless listed here.
 
 ## 6. Database
 
-New database, the tables of v1 are not migrated. Run `dotnet ef database update` (or `Update-Database`) to apply the new migration `AddedAlertTables`.
+New database, the tables of v1 are not migrated. Run `dotnet ef database update` (or `Update-Database`) to apply the new migrations `AddedAlertTables`, `MovedSettingsToGuildSettings` and `RenamedDiscordIds` (only renames columns and an index, no data is lost).
 
 - Every table has a GuidV7 `Id` as primary key, plus `CreatedAt` and `UpdatedAt` (`BaseEntity`).
-- Discord ids (`GuildId`, `RoleId`, channel ids, ...) are normal columns, `Guilds.GuildId` is unique.
-- Filters and role links reference the guild by its `Id` (foreign key column `GuildId`, cascade delete).
-- Tables: `Guilds`, `Filters`, `RoleLinks`, `HistoryMatchAlerts`, `HistoryResultAlerts`.
+- Discord ids are normal columns named `...DiscordId` (`Guilds.DiscordId`, `Guilds.AlertRoleDiscordId`, `Filters.RoleDiscordId`, `RoleLinks.BotRoleDiscordId`, ...). `Guilds.DiscordId` is unique.
+- Settings, filters and role links reference the guild by its internal `Id` (foreign key column `GuildId`, cascade delete). `GuildId` is always the internal Guid, never the Discord id.
+- Tables: `Guilds`, `GuildSettings`, `Filters`, `RoleLinks`, `HistoryMatchAlerts`, `HistoryResultAlerts`.
+- `Guilds` only holds the guild data and the alert config (`AlertRoleDiscordId`, `MatchAlertsChannelDiscordId`, `ResultAlertsChannelDiscordId`). The settings (`AlertsPaused`, `MentionOnDelays`, `MentionOnResults`, `CensorResults`) are in `GuildSettings`, one row per guild (`GuildSettings.GuildId` is unique). Every new guild gets its settings row with the defaults when it is created.
+- `MovedSettingsToGuildSettings` copies the settings of already existing guilds from the old `Guilds` columns into `GuildSettings` before it drops the columns (and back, when it is reverted).
 - Removed tables: `FiltersNews`, `HistoryNewsAlerts` and all `HLTV_*` tables. Matches, results, events and teams are no longer stored, they come from the (cached) `LiquipediaService`.
 - `HistoryMatchAlerts` / `HistoryResultAlerts` use the Liquipedia `MatchId` (unique) instead of the HLTV url.
 
@@ -199,7 +221,7 @@ New database, the tables of v1 are not migrated. Run `dotnet ef database update`
 - `LiquipediaService`: cache time of matches and results is 5 minutes (was 3). All `Get...Async` methods have an optional `refetch` parameter, that skips the cache and replaces the cached data.
 - `BackgroundWorker`: runs every 5 minutes (synced to the clock), refetches matches and results once and passes them to `MatchDelaysService`, `MatchAlertsService` and `ResultAlertsService`. An exception in a run is logged and does not stop the worker.
 - The 24 hour worker is gone, teams and events are cached for 24 hours by the `LiquipediaService`.
-- `AlertsHelper` has one filter comparison for matches and results (v1 had a copy for upcoming matches, live matches and results). Guilds, filters and role links are loaded with one query per run instead of one query per guild / role.
+- `AlertsHelper` has one filter comparison for matches and results (v1 had a copy for upcoming matches, live matches and results). Guilds, settings, filters and role links are loaded with one query per run instead of one query per guild / role.
 - `AlertStreamService` (singleton) holds the connected stream clients, `AlertStreamHeartbeat` sends the heartbeat.
 - Repos take the already loaded `Guild` instead of loading it a second time by its id.
 - `MatchBase` has the new computed properties `Tier`, `TierString` and `IsHltvCovered`.

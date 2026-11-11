@@ -6,9 +6,9 @@ public class MatchDelayDto
 {
     public class GuildData
     {
-        public string ChannelId { get; set; } = null!;
+        public string ChannelDiscordId { get; set; } = null!;
         public bool MentionOnDelays { get; set; }
-        public List<string> RoleIds { get; set; } = new();
+        public List<string> RoleDiscordIds { get; set; } = new();
     }
 
     public MatchUpcoming Match { get; set; } = null!;

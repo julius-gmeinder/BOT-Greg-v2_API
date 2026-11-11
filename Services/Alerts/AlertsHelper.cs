@@ -35,41 +35,41 @@ public class AlertsHelper
         var matches = await _liquipedia.GetMatchesAsync();
         var teamsByName = await GetTeamsByNameAsync();
 
-        return matches.FirstOrDefault(match => GetMatchingFilterRoleIds(guild, match, teamsByName) != null);
+        return matches.FirstOrDefault(match => GetMatchingFilterRoleDiscordIds(guild, match, teamsByName) != null);
     }
 
     // returns null if the guild should not be alerted about the match
     public List<string>? GetRolesToPing(Guild guild, MatchBase match, Dictionary<string, Team> teamsByName)
     {
-        var matchingRoleIds = GetMatchingFilterRoleIds(guild, match, teamsByName);
+        var matchingRoleDiscordIds = GetMatchingFilterRoleDiscordIds(guild, match, teamsByName);
 
-        if (matchingRoleIds == null)
+        if (matchingRoleDiscordIds == null)
             return null;
 
-        List<string> rolesToPing = [guild.AlertRoleId!, .. matchingRoleIds];
+        List<string> rolesToPing = [guild.AlertRoleDiscordId!, .. matchingRoleDiscordIds];
 
-        var linkedRoleIds = guild.RoleLinks
-            .Where(link => rolesToPing.Contains(link.BotRoleId))
-            .Select(link => link.LinkedRoleId)
+        var linkedRoleDiscordIds = guild.RoleLinks
+            .Where(link => rolesToPing.Contains(link.BotRoleDiscordId))
+            .Select(link => link.LinkedRoleDiscordId)
             .ToList();
 
-        rolesToPing.AddRange(linkedRoleIds);
+        rolesToPing.AddRange(linkedRoleDiscordIds);
 
         return rolesToPing.Distinct().ToList();
     }
 
     // returns the roles of all filters the match passes, or null if the match passes none of them
-    private List<string>? GetMatchingFilterRoleIds(Guild guild, MatchBase match, Dictionary<string, Team> teamsByName)
+    private List<string>? GetMatchingFilterRoleDiscordIds(Guild guild, MatchBase match, Dictionary<string, Team> teamsByName)
     {
         if (guild.Filters.Count == 0)
             return MatchPassesFilter(match, DefaultFilter, teamsByName) ? new List<string>() : null;
 
-        var matchingRoleIds = guild.Filters
+        var matchingRoleDiscordIds = guild.Filters
             .Where(filter => MatchPassesFilter(match, filter, teamsByName))
-            .Select(filter => filter.RoleId)
+            .Select(filter => filter.RoleDiscordId)
             .ToList();
 
-        return matchingRoleIds.Count > 0 ? matchingRoleIds : null;
+        return matchingRoleDiscordIds.Count > 0 ? matchingRoleDiscordIds : null;
     }
 
     // a filter property that is null means "dont care", all other properties have to fit the match

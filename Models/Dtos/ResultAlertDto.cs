@@ -6,10 +6,10 @@ public class ResultAlertDto
 {
     public class GuildData
     {
-        public string ChannelId { get; set; } = null!;
+        public string ChannelDiscordId { get; set; } = null!;
         public bool MentionOnResults { get; set; }
         public bool CensorResults { get; set; }
-        public List<string> RoleIds { get; set; } = new();
+        public List<string> RoleDiscordIds { get; set; } = new();
     }
 
     public MatchResult Result { get; set; } = null!;

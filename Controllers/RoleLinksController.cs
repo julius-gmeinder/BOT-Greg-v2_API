@@ -22,18 +22,18 @@ public class RoleLinksController : ControllerBase
     [HttpPost("")]
     public async Task<IActionResult> AddRoleLinkAsync([FromBody] RoleLinkAddDto linkDto)
     {
-        var guild = await _guilds.GetGuildAsync(linkDto.GuildId);
+        var guild = await _guilds.GetGuildAsync(linkDto.GuildDiscordId);
         if (guild == null)
             return NotFound();
 
-        if (!_roles.RoleExists(guild, linkDto.BotRoleId))
+        if (!_roles.RoleExists(guild, linkDto.BotRoleDiscordId))
             return NotFound();
 
-        var links = await _links.GetRoleLinksAsync(linkDto.GuildId);
+        var links = await _links.GetRoleLinksAsync(linkDto.GuildDiscordId);
         if (links.Count >= Constants.MaxRoleLinksPerGuild)
             return Conflict("limit");
 
-        if (links.Any(x => x.BotRoleId == linkDto.BotRoleId && x.LinkedRoleId == linkDto.LinkedRoleId))
+        if (links.Any(x => x.BotRoleDiscordId == linkDto.BotRoleDiscordId && x.LinkedRoleDiscordId == linkDto.LinkedRoleDiscordId))
             return Conflict("duplicate");
 
         await _links.LinkRolesAsync(guild, linkDto);
@@ -43,7 +43,7 @@ public class RoleLinksController : ControllerBase
     [HttpDelete("")]
     public async Task<IActionResult> RemoveRoleLinkAsync([FromBody] RoleLinkRemoveDto linkDto)
     {
-        var link = await _links.GetRoleLinkAsync(linkDto.BotRoleId, linkDto.LinkedRoleId);
+        var link = await _links.GetRoleLinkAsync(linkDto.BotRoleDiscordId, linkDto.LinkedRoleDiscordId);
         if (link == null)
             return NotFound();
 
@@ -52,9 +52,9 @@ public class RoleLinksController : ControllerBase
     }
 
     [HttpGet("tree")]
-    public async Task<IActionResult> GetRoleLinksTreeAsync([FromQuery] string guildId)
+    public async Task<IActionResult> GetRoleLinksTreeAsync([FromQuery] string guildDiscordId)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return NotFound();
 
@@ -62,19 +62,19 @@ public class RoleLinksController : ControllerBase
     }
 
     [HttpGet("bot")]
-    public async Task<IActionResult> GetLinkedBotRoleIdsAsync([FromQuery] string guildId)
+    public async Task<IActionResult> GetLinkedBotRoleDiscordIdsAsync([FromQuery] string guildDiscordId)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return NotFound();
 
-        return Ok(_links.GetDistinctLinkedBotRoleIds(guild));
+        return Ok(_links.GetDistinctLinkedBotRoleDiscordIds(guild));
     }
 
     [HttpGet("linked")]
-    public async Task<IActionResult> GetLinkedRoleIdsAsync([FromQuery] string botRoleId)
+    public async Task<IActionResult> GetLinkedRoleDiscordIdsAsync([FromQuery] string botRoleDiscordId)
     {
-        var linkedRoleIds = await _links.GetLinkedRoleIdsAsync(botRoleId);
-        return Ok(linkedRoleIds);
+        var linkedRoleDiscordIds = await _links.GetLinkedRoleDiscordIdsAsync(botRoleDiscordId);
+        return Ok(linkedRoleDiscordIds);
     }
 }

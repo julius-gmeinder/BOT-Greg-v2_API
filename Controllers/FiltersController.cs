@@ -18,13 +18,13 @@ public class FiltersController : ControllerBase
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> GetFiltersAsync([FromQuery] string guildId)
+    public async Task<IActionResult> GetFiltersAsync([FromQuery] string guildDiscordId)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return NotFound();
 
-        var filters = await _filters.GetFiltersAsync(guildId);
+        var filters = await _filters.GetFiltersAsync(guildDiscordId);
         List<FilterDto> filterDtos = new();
 
         foreach (var filter in filters)
@@ -32,7 +32,7 @@ public class FiltersController : ControllerBase
             filterDtos.Add(new FilterDto()
             {
                 Nr = filterDtos.Count + 1,
-                RoleId = filter.RoleId,
+                RoleDiscordId = filter.RoleDiscordId,
                 Team = filter.Team,
                 Event = filter.Event,
                 EventTier = filter.EventTier,
@@ -45,27 +45,27 @@ public class FiltersController : ControllerBase
     }
 
     [HttpGet("roles")]
-    public async Task<IActionResult> GetFiltersRoleIdsAsync([FromQuery] string guildId)
+    public async Task<IActionResult> GetFiltersRoleDiscordIdsAsync([FromQuery] string guildDiscordId)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return NotFound();
 
-        var filters = await _filters.GetFiltersAsync(guildId);
-        var filterRoleIds = filters.Select(x => x.RoleId);
+        var filters = await _filters.GetFiltersAsync(guildDiscordId);
+        var filterRoleDiscordIds = filters.Select(x => x.RoleDiscordId);
 
-        return Ok(filterRoleIds);
+        return Ok(filterRoleDiscordIds);
     }
 
     // the properties of the filter are validated by the attributes of the dto
     [HttpPost("")]
     public async Task<IActionResult> AddFilterAsync([FromBody] FilterAddDto filterDto)
     {
-        var guild = await _guilds.GetGuildAsync(filterDto.GuildId);
+        var guild = await _guilds.GetGuildAsync(filterDto.GuildDiscordId);
         if (guild == null)
             return NotFound();
 
-        var filters = await _filters.GetFiltersAsync(filterDto.GuildId);
+        var filters = await _filters.GetFiltersAsync(filterDto.GuildDiscordId);
         if (filters.Count >= Constants.MaxFiltersPerGuild)
             return Conflict("limit");
 
@@ -86,11 +86,11 @@ public class FiltersController : ControllerBase
     [HttpDelete("")]
     public async Task<IActionResult> RemoveFiltersAsync([FromBody] FilterDeleteDto filterDto)
     {
-        var guild = await _guilds.GetGuildAsync(filterDto.GuildId);
+        var guild = await _guilds.GetGuildAsync(filterDto.GuildDiscordId);
         if (guild == null)
             return NotFound();
 
-        var roleIdsToDelete = await _filters.RemoveFiltersAsync(filterDto);
-        return Ok(roleIdsToDelete);
+        var roleDiscordIdsToDelete = await _filters.RemoveFiltersAsync(filterDto);
+        return Ok(roleDiscordIdsToDelete);
     }
 }

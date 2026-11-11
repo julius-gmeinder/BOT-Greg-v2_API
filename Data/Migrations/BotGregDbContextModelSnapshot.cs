@@ -47,7 +47,7 @@ namespace BOT_Greg_v2_API.Data.Migrations
                     b.Property<bool?>("HltvCoverage")
                         .HasColumnType("tinyint(1)");
 
-                    b.Property<string>("RoleId")
+                    b.Property<string>("RoleDiscordId")
                         .IsRequired()
                         .HasMaxLength(22)
                         .HasColumnType("varchar(22)");
@@ -75,20 +75,14 @@ namespace BOT_Greg_v2_API.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
-                    b.Property<string>("AlertRoleId")
+                    b.Property<string>("AlertRoleDiscordId")
                         .HasMaxLength(22)
                         .HasColumnType("varchar(22)");
-
-                    b.Property<bool>("AlertsPaused")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<bool>("CensorResults")
-                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("GuildId")
+                    b.Property<string>("DiscordId")
                         .IsRequired()
                         .HasMaxLength(22)
                         .HasColumnType("varchar(22)");
@@ -100,19 +94,48 @@ namespace BOT_Greg_v2_API.Data.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("MatchAlertsChannelId")
+                    b.Property<string>("MatchAlertsChannelDiscordId")
                         .HasMaxLength(22)
                         .HasColumnType("varchar(22)");
+
+                    b.Property<string>("ResultAlertsChannelDiscordId")
+                        .HasMaxLength(22)
+                        .HasColumnType("varchar(22)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DiscordId")
+                        .IsUnique();
+
+                    b.ToTable("Guilds");
+                });
+
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.GuildSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("AlertsPaused")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("CensorResults")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("GuildId")
+                        .HasColumnType("char(36)");
 
                     b.Property<bool>("MentionOnDelays")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("MentionOnResults")
                         .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("ResultAlertsChannelId")
-                        .HasMaxLength(22)
-                        .HasColumnType("varchar(22)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime(6)");
@@ -122,7 +145,7 @@ namespace BOT_Greg_v2_API.Data.Migrations
                     b.HasIndex("GuildId")
                         .IsUnique();
 
-                    b.ToTable("Guilds");
+                    b.ToTable("GuildSettings");
                 });
 
             modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.HistoryMatchAlert", b =>
@@ -190,7 +213,7 @@ namespace BOT_Greg_v2_API.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
-                    b.Property<string>("BotRoleId")
+                    b.Property<string>("BotRoleDiscordId")
                         .IsRequired()
                         .HasMaxLength(22)
                         .HasColumnType("varchar(22)");
@@ -201,7 +224,7 @@ namespace BOT_Greg_v2_API.Data.Migrations
                     b.Property<Guid>("GuildId")
                         .HasColumnType("char(36)");
 
-                    b.Property<string>("LinkedRoleId")
+                    b.Property<string>("LinkedRoleDiscordId")
                         .IsRequired()
                         .HasMaxLength(22)
                         .HasColumnType("varchar(22)");
@@ -227,6 +250,17 @@ namespace BOT_Greg_v2_API.Data.Migrations
                     b.Navigation("Guild");
                 });
 
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.GuildSettings", b =>
+                {
+                    b.HasOne("BOT_Greg_v2_API.Models.Entities.Guild", "Guild")
+                        .WithOne("Settings")
+                        .HasForeignKey("BOT_Greg_v2_API.Models.Entities.GuildSettings", "GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Guild");
+                });
+
             modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.RoleLink", b =>
                 {
                     b.HasOne("BOT_Greg_v2_API.Models.Entities.Guild", "Guild")
@@ -243,6 +277,9 @@ namespace BOT_Greg_v2_API.Data.Migrations
                     b.Navigation("Filters");
 
                     b.Navigation("RoleLinks");
+
+                    b.Navigation("Settings")
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

@@ -17,22 +17,22 @@ public class RolesController : ControllerBase
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> GetAllRoleIdsAsync([FromQuery] string guildId)
+    public async Task<IActionResult> GetAllRoleDiscordIdsAsync([FromQuery] string guildDiscordId)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return Ok(new List<string>());
 
-        return Ok(_roles.GetAllRoleIds(guild));
+        return Ok(_roles.GetAllRoleDiscordIds(guild));
     }
 
     [HttpGet("default")]
-    public async Task<IActionResult> GetDefaultRoleIdAsync([FromQuery] string guildId)
+    public async Task<IActionResult> GetDefaultRoleDiscordIdAsync([FromQuery] string guildDiscordId)
     {
-        var guild = await _guilds.GetGuildAsync(guildId);
-        if (guild?.AlertRoleId == null)
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
+        if (guild?.AlertRoleDiscordId == null)
             return NotFound();
 
-        return Ok(guild.AlertRoleId);
+        return Ok(guild.AlertRoleDiscordId);
     }
 }

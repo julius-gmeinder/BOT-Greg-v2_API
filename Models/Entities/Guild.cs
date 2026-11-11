@@ -3,11 +3,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace BOT_Greg_v2_API.Models.Entities;
 
-[Index(nameof(GuildId), IsUnique = true)]
+[Index(nameof(DiscordId), IsUnique = true)]
 public class Guild : BaseEntity
 {
     [Required, MaxLength(22)]
-    public string GuildId { get; set; } = null!;
+    public string DiscordId { get; set; } = null!;
 
     [Required]
     public string GuildName { get; set; } = null!;
@@ -16,22 +16,15 @@ public class Guild : BaseEntity
     public int GuildMemberCount { get; set; }
 
     [MaxLength(22)]
-    public string? AlertRoleId { get; set; } = null;
+    public string? AlertRoleDiscordId { get; set; } = null;
 
     [MaxLength(22)]
-    public string? MatchAlertsChannelId { get; set; } = null;
+    public string? MatchAlertsChannelDiscordId { get; set; } = null;
 
     [MaxLength(22)]
-    public string? ResultAlertsChannelId { get; set; } = null;
+    public string? ResultAlertsChannelDiscordId { get; set; } = null;
 
-    public bool AlertsPaused { get; set; } = false;
-
-    public bool MentionOnDelays { get; set; } = false;
-
-    public bool MentionOnResults { get; set; } = true;
-
-    public bool CensorResults { get; set; } = false;
-
+    public virtual GuildSettings Settings { get; set; } = null!;
     public virtual List<Filter> Filters { get; set; } = new List<Filter>();
 
     public virtual List<RoleLink> RoleLinks { get; set; } = new List<RoleLink>();

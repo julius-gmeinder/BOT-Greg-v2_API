@@ -16,22 +16,22 @@ public class RoleLinksRepo
         _roles = roles;
     }
 
-    public async Task<List<RoleLink>> GetRoleLinksAsync(string guildId)
+    public async Task<List<RoleLink>> GetRoleLinksAsync(string guildDiscordId)
     {
-        return await _db.RoleLinks.Where(x => x.Guild.GuildId == guildId).ToListAsync();
+        return await _db.RoleLinks.Where(x => x.Guild.DiscordId == guildDiscordId).ToListAsync();
     }
 
-    public async Task<RoleLink?> GetRoleLinkAsync(string botRoleId, string linkedRoleId)
+    public async Task<RoleLink?> GetRoleLinkAsync(string botRoleDiscordId, string linkedRoleDiscordId)
     {
-        return await _db.RoleLinks.FirstOrDefaultAsync(x => x.BotRoleId == botRoleId && x.LinkedRoleId == linkedRoleId);
+        return await _db.RoleLinks.FirstOrDefaultAsync(x => x.BotRoleDiscordId == botRoleDiscordId && x.LinkedRoleDiscordId == linkedRoleDiscordId);
     }
 
     public async Task LinkRolesAsync(Guild guild, RoleLinkAddDto linkDto)
     {
         _db.RoleLinks.Add(new RoleLink()
         {
-            BotRoleId = linkDto.BotRoleId,
-            LinkedRoleId = linkDto.LinkedRoleId,
+            BotRoleDiscordId = linkDto.BotRoleDiscordId,
+            LinkedRoleDiscordId = linkDto.LinkedRoleDiscordId,
             Guild = guild
         });
 
@@ -44,26 +44,26 @@ public class RoleLinksRepo
         await _db.SaveChangesAsync();
     }
 
-    public async Task<List<string>> GetLinkedRoleIdsAsync(string botRoleId)
+    public async Task<List<string>> GetLinkedRoleDiscordIdsAsync(string botRoleDiscordId)
     {
-        return await _db.RoleLinks.Where(x => x.BotRoleId == botRoleId).Select(x => x.LinkedRoleId).ToListAsync();
+        return await _db.RoleLinks.Where(x => x.BotRoleDiscordId == botRoleDiscordId).Select(x => x.LinkedRoleDiscordId).ToListAsync();
     }
 
-    public List<string> GetDistinctLinkedBotRoleIds(Guild guild)
+    public List<string> GetDistinctLinkedBotRoleDiscordIds(Guild guild)
     {
-        return guild.RoleLinks.Select(x => x.BotRoleId).Distinct().ToList();
+        return guild.RoleLinks.Select(x => x.BotRoleDiscordId).Distinct().ToList();
     }
 
     public List<RoleLinksTreeItemDto> GetRoleLinksTree(Guild guild)
     {
         List<RoleLinksTreeItemDto> tree = new();
 
-        foreach (var botRoleId in _roles.GetAllRoleIds(guild))
+        foreach (var botRoleDiscordId in _roles.GetAllRoleDiscordIds(guild))
         {
             tree.Add(new RoleLinksTreeItemDto()
             {
-                BotRoleId = botRoleId,
-                LinkedRoleIds = guild.RoleLinks.Where(x => x.BotRoleId == botRoleId).Select(x => x.LinkedRoleId).ToList()
+                BotRoleDiscordId = botRoleDiscordId,
+                LinkedRoleDiscordIds = guild.RoleLinks.Where(x => x.BotRoleDiscordId == botRoleDiscordId).Select(x => x.LinkedRoleDiscordId).ToList()
             });
         }
 

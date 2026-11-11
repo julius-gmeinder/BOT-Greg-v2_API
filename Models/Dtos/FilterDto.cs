@@ -6,7 +6,7 @@ public class FilterDto
 {
     public int Nr { get; set; }
 
-    public string RoleId { get; set; } = null!;
+    public string RoleDiscordId { get; set; } = null!;
 
     public string? Team { get; set; }
 

@@ -47,9 +47,9 @@ public class MatchDelaysService
 
                 matchDelay.Guilds.Add(new MatchDelayDto.GuildData()
                 {
-                    ChannelId = guild.MatchAlertsChannelId!,
-                    MentionOnDelays = guild.MentionOnDelays,
-                    RoleIds = rolesToPing
+                    ChannelDiscordId = guild.MatchAlertsChannelDiscordId!,
+                    MentionOnDelays = guild.Settings.MentionOnDelays,
+                    RoleDiscordIds = rolesToPing
                 });
             }
 
