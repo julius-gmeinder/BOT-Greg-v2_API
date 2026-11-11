@@ -8,12 +8,12 @@ namespace BOT_Greg_v2_API.Controllers;
 [ApiController]
 public class FiltersController : ControllerBase
 {
-    private readonly FiltersRepo _filtersMatRes;
+    private readonly FiltersRepo _filters;
     private readonly GuildsRepo _guilds;
 
-    public FiltersController(FiltersRepo filtersMatRes, GuildsRepo guilds)
+    public FiltersController(FiltersRepo filters, GuildsRepo guilds)
     {
-        _filtersMatRes = filtersMatRes;
+        _filters = filters;
         _guilds = guilds;
     }
 
@@ -24,7 +24,7 @@ public class FiltersController : ControllerBase
         if (guild == null)
             return NotFound();
 
-        var filters = await _filtersMatRes.GetFiltersAsync(guildId);
+        var filters = await _filters.GetFiltersAsync(guildId);
         List<FilterDto> filterDtos = new();
 
         foreach (var filter in filters)
@@ -51,7 +51,7 @@ public class FiltersController : ControllerBase
         if (guild == null)
             return NotFound();
 
-        var filters = await _filtersMatRes.GetFiltersAsync(guildId);
+        var filters = await _filters.GetFiltersAsync(guildId);
         var filterRoleIds = filters.Select(x => x.RoleId);
 
         return Ok(filterRoleIds);
@@ -65,7 +65,7 @@ public class FiltersController : ControllerBase
         if (guild == null)
             return NotFound();
 
-        var filters = await _filtersMatRes.GetFiltersAsync(filterDto.GuildId);
+        var filters = await _filters.GetFiltersAsync(filterDto.GuildId);
         if (filters.Count >= Constants.MaxFiltersPerGuild)
             return Conflict("limit");
 
@@ -79,7 +79,7 @@ public class FiltersController : ControllerBase
         if (isDuplicate)
             return Conflict("duplicate");
 
-        await _filtersMatRes.AddFilterAsync(guild, filterDto);
+        await _filters.AddFilterAsync(guild, filterDto);
         return NoContent();
     }
 
@@ -90,7 +90,7 @@ public class FiltersController : ControllerBase
         if (guild == null)
             return NotFound();
 
-        var roleIdsToDelete = await _filtersMatRes.RemoveFiltersAsync(filterDto);
+        var roleIdsToDelete = await _filters.RemoveFiltersAsync(filterDto);
         return Ok(roleIdsToDelete);
     }
 }

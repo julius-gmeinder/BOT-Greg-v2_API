@@ -32,7 +32,7 @@ public class Guild : BaseEntity
 
     public bool CensorResults { get; set; } = false;
 
-    public virtual List<Filter> FiltersMatRes { get; set; } = new List<Filter>();
+    public virtual List<Filter> Filters { get; set; } = new List<Filter>();
 
     public virtual List<RoleLink> RoleLinks { get; set; } = new List<RoleLink>();
 }

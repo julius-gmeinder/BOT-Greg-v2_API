@@ -47,7 +47,7 @@ public class AlertsController : ControllerBase
         AlertConfigResDto res = new()
         {
             NewConfig = await _guilds.SetGuildsConfigAsync(guild, configDto),
-            MatResFilterCount = guild.FiltersMatRes.Count,
+            FilterCount = guild.Filters.Count,
             GuildsNextUpcomingMatch = await _alertsHelper.GetGuildsNextMatchAsync(guild)
         };
 

@@ -61,10 +61,10 @@ public class AlertsHelper
     // returns the roles of all filters the match passes, or null if the match passes none of them
     private List<string>? GetMatchingFilterRoleIds(Guild guild, MatchBase match, Dictionary<string, Team> teamsByName)
     {
-        if (guild.FiltersMatRes.Count == 0)
+        if (guild.Filters.Count == 0)
             return MatchPassesFilter(match, DefaultFilter, teamsByName) ? new List<string>() : null;
 
-        var matchingRoleIds = guild.FiltersMatRes
+        var matchingRoleIds = guild.Filters
             .Where(filter => MatchPassesFilter(match, filter, teamsByName))
             .Select(filter => filter.RoleId)
             .ToList();

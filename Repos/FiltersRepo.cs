@@ -16,12 +16,12 @@ public class FiltersRepo
 
     public async Task<List<Filter>> GetFiltersAsync(string guildId)
     {
-        return await _db.FiltersMatRes.Where(x => x.Guild.GuildId == guildId).OrderBy(x => x.CreatedAt).ToListAsync();
+        return await _db.Filters.Where(x => x.Guild.GuildId == guildId).OrderBy(x => x.CreatedAt).ToListAsync();
     }
 
     public async Task AddFilterAsync(Guild guild, FilterAddDto filterDto)
     {
-        _db.FiltersMatRes.Add(new Filter()
+        _db.Filters.Add(new Filter()
         {
             Team = filterDto.Team,
             Event = filterDto.Event,
@@ -37,7 +37,7 @@ public class FiltersRepo
 
     public async Task<List<string>> RemoveFiltersAsync(FilterDeleteDto filterDto)
     {
-        var filters = await _db.FiltersMatRes
+        var filters = await _db.Filters
             .Where(x => x.Guild.GuildId == filterDto.GuildId && filterDto.RoleIds.Contains(x.RoleId))
             .ToListAsync();
 
@@ -48,7 +48,7 @@ public class FiltersRepo
             .Where(x => x.Guild.GuildId == filterDto.GuildId && roleIdsToDelete.Contains(x.BotRoleId))
             .ToListAsync();
 
-        _db.FiltersMatRes.RemoveRange(filters);
+        _db.Filters.RemoveRange(filters);
         _db.RoleLinks.RemoveRange(roleLinks);
 
         await _db.SaveChangesAsync();

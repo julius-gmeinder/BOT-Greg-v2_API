@@ -31,7 +31,7 @@ public class AlertsRepo
     private IQueryable<Guild> GuildsWithFiltersAndLinks()
     {
         return _db.Guilds
-            .Include(x => x.FiltersMatRes)
+            .Include(x => x.Filters)
             .Include(x => x.RoleLinks)
             .AsSplitQuery();
     }

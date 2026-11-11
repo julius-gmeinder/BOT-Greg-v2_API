@@ -25,7 +25,7 @@ namespace BOT_Greg_v2_API.Data.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
-            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.FilterMatRes", b =>
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.Filter", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -66,7 +66,7 @@ namespace BOT_Greg_v2_API.Data.Migrations
 
                     b.HasIndex("GuildId");
 
-                    b.ToTable("FiltersMatRes");
+                    b.ToTable("Filters");
                 });
 
             modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.Guild", b =>
@@ -216,10 +216,10 @@ namespace BOT_Greg_v2_API.Data.Migrations
                     b.ToTable("RoleLinks");
                 });
 
-            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.FilterMatRes", b =>
+            modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.Filter", b =>
                 {
                     b.HasOne("BOT_Greg_v2_API.Models.Entities.Guild", "Guild")
-                        .WithMany("FiltersMatRes")
+                        .WithMany("Filters")
                         .HasForeignKey("GuildId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -240,7 +240,7 @@ namespace BOT_Greg_v2_API.Data.Migrations
 
             modelBuilder.Entity("BOT_Greg_v2_API.Models.Entities.Guild", b =>
                 {
-                    b.Navigation("FiltersMatRes");
+                    b.Navigation("Filters");
 
                     b.Navigation("RoleLinks");
                 });

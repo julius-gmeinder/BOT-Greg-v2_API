@@ -12,7 +12,7 @@ public class RolesRepo
         if (guild.AlertRoleId != null)
             roles.Add(guild.AlertRoleId);
 
-        roles.AddRange(guild.FiltersMatRes.OrderBy(x => x.CreatedAt).Select(x => x.RoleId));
+        roles.AddRange(guild.Filters.OrderBy(x => x.CreatedAt).Select(x => x.RoleId));
 
         return roles;
     }

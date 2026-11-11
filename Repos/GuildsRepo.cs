@@ -39,7 +39,7 @@ public class GuildsRepo
 
     public async Task ResetGuildAsync(Guild guild)
     {
-        _db.FiltersMatRes.RemoveRange(guild.FiltersMatRes.ToList());
+        _db.Filters.RemoveRange(guild.Filters.ToList());
         _db.RoleLinks.RemoveRange(guild.RoleLinks.ToList());
 
         guild.AlertRoleId = null;

@@ -122,14 +122,14 @@ Routes, methods and status codes are the same as in v1 unless listed here.
 |---|---|
 | `GET api/Alerts/stream` | new, see section 1 |
 | `GET api/Alerts/config` | response without `newsAlertChannelId` |
-| `POST api/Alerts/config` | body without `newsAlertChannelId`. Response: `{ newConfig, matResFilterCount, guildsNextUpcomingMatch }` (without `newsFilterCount` and `guildsLiveMatches`). `newConfig` is the config that is actually saved now (v1 echoed the request body, so `alertRoleId` could be null although a role was set) |
+| `POST api/Alerts/config` | body without `newsAlertChannelId`. Response: `{ newConfig, filterCount, guildsNextUpcomingMatch }` (without `newsFilterCount` and `guildsLiveMatches`). `newConfig` is the config that is actually saved now (v1 echoed the request body, so `alertRoleId` could be null although a role was set) |
 
-### FiltersMatRes
+### Filters
 
 | Endpoint | Change |
 |---|---|
-| `GET api/FiltersMatRes` | filter: `{ nr, roleId, team, event, eventTier, eventTierString, vrsRank, hltvCoverage }` |
-| `POST api/FiltersMatRes` | body: `{ guildId, roleId, team?, event?, eventTier?, vrsRank?, hltvCoverage? }` |
+| `GET api/Filters` | filter: `{ nr, roleId, team, event, eventTier, eventTierString, vrsRank, hltvCoverage }` |
+| `POST api/Filters` | body: `{ guildId, roleId, team?, event?, eventTier?, vrsRank?, hltvCoverage? }` |
 
 - `stars` removed.
 - `eventTier` is a number (`0` - `4`) instead of a string. The match has to be in this tier or above.
@@ -138,7 +138,7 @@ Routes, methods and status codes are the same as in v1 unless listed here.
 - `vrsRank` has to be between 1 and 1000 (v1: 500).
 - `team` and `event` have to be the Liquipedia names (the `value` of the autocomplete endpoints). HLTV names from v1 will not match.
 - Invalid values still return `400`, but the body is a validation problem object (`{ errors: { ... } }`) now.
-- Deleting filters (`DELETE api/FiltersMatRes`) also deletes the role links of the deleted filter roles.
+- Deleting filters (`DELETE api/Filters`) also deletes the role links of the deleted filter roles.
 
 ### Autocomplete
 
@@ -188,7 +188,7 @@ New database, the tables of v1 are not migrated. Run `dotnet ef database update`
 - Every table has a GuidV7 `Id` as primary key, plus `CreatedAt` and `UpdatedAt` (`BaseEntity`).
 - Discord ids (`GuildId`, `RoleId`, channel ids, ...) are normal columns, `Guilds.GuildId` is unique.
 - Filters and role links reference the guild by its `Id` (foreign key column `GuildId`, cascade delete).
-- Tables: `Guilds`, `FiltersMatRes`, `RoleLinks`, `HistoryMatchAlerts`, `HistoryResultAlerts`.
+- Tables: `Guilds`, `Filters`, `RoleLinks`, `HistoryMatchAlerts`, `HistoryResultAlerts`.
 - Removed tables: `FiltersNews`, `HistoryNewsAlerts` and all `HLTV_*` tables. Matches, results, events and teams are no longer stored, they come from the (cached) `LiquipediaService`.
 - `HistoryMatchAlerts` / `HistoryResultAlerts` use the Liquipedia `MatchId` (unique) instead of the HLTV url.
 

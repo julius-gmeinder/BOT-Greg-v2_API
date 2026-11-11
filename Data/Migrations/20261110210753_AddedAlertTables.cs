@@ -64,7 +64,7 @@ namespace BOT_Greg_v2_API.Data.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "FiltersMatRes",
+                name: "Filters",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
@@ -83,9 +83,9 @@ namespace BOT_Greg_v2_API.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_FiltersMatRes", x => x.Id);
+                    table.PrimaryKey("PK_Filters", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_FiltersMatRes_Guilds_GuildId",
+                        name: "FK_Filters_Guilds_GuildId",
                         column: x => x.GuildId,
                         principalTable: "Guilds",
                         principalColumn: "Id",
@@ -154,8 +154,8 @@ namespace BOT_Greg_v2_API.Data.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateIndex(
-                name: "IX_FiltersMatRes_GuildId",
-                table: "FiltersMatRes",
+                name: "IX_Filters_GuildId",
+                table: "Filters",
                 column: "GuildId");
 
             migrationBuilder.CreateIndex(
@@ -180,7 +180,7 @@ namespace BOT_Greg_v2_API.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "FiltersMatRes");
+                name: "Filters");
 
             migrationBuilder.DropTable(
                 name: "HistoryMatchAlerts");
