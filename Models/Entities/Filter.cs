@@ -18,8 +18,9 @@ public class Filter : BaseEntity
 
     public bool? HltvCoverage { get; set; } = null;
 
-    [Required, MaxLength(22)]
-    public string RoleDiscordId { get; set; } = null!;
+    // only set if the role management of the guild is enabled, the bot creates one role per filter then
+    [MaxLength(22)]
+    public string? RoleDiscordId { get; set; } = null;
 
     [Required]
     public virtual Guild Guild { get; set; } = null!;

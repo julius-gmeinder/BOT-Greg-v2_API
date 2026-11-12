@@ -8,8 +8,9 @@ public class FilterAddDto
     [Required]
     public string GuildDiscordId { get; set; } = null!;
 
-    [Required, MaxLength(22)]
-    public string RoleDiscordId { get; set; } = null!;
+    // has to be set if the role management of the guild is enabled, and must not be set if it is disabled
+    [MaxLength(22)]
+    public string? RoleDiscordId { get; set; } = null;
 
     [MaxLength(64)]
     public string? Team { get; set; } = null;

@@ -13,17 +13,18 @@ public class AlertsRepo
         _db = db;
     }
 
+    // the alert role is not required, guilds without role management get their alerts without any mention
     public async Task<List<Guild>> GetMatchAlertGuildsAsync()
     {
         return await GuildsWithSettingsFiltersAndLinks()
-            .Where(x => x.MatchAlertsChannelDiscordId != null && x.AlertRoleDiscordId != null && x.Settings.AlertsPaused == false)
+            .Where(x => x.MatchAlertsChannelDiscordId != null && x.Settings.AlertsPaused == false)
             .ToListAsync();
     }
 
     public async Task<List<Guild>> GetResultAlertGuildsAsync()
     {
         return await GuildsWithSettingsFiltersAndLinks()
-            .Where(x => x.ResultAlertsChannelDiscordId != null && x.AlertRoleDiscordId != null && x.Settings.AlertsPaused == false)
+            .Where(x => x.ResultAlertsChannelDiscordId != null && x.Settings.AlertsPaused == false)
             .ToListAsync();
     }
 

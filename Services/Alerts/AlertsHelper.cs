@@ -7,13 +7,6 @@ public class AlertsHelper
 {
     private readonly LiquipediaService _liquipedia;
 
-    // liquipedia covers a lot more matches than hltv did,
-    // so guilds without own filters only get the matches that are also covered by hltv
-    private static readonly Filter DefaultFilter = new()
-    {
-        HltvCoverage = true
-    };
-
     public AlertsHelper(LiquipediaService liquipedia)
     {
         _liquipedia = liquipedia;
@@ -35,18 +28,31 @@ public class AlertsHelper
         var matches = await _liquipedia.GetMatchesAsync();
         var teamsByName = await GetTeamsByNameAsync();
 
-        return matches.FirstOrDefault(match => GetMatchingFilterRoleDiscordIds(guild, match, teamsByName) != null);
+        return matches.FirstOrDefault(match => GetMatchingFilters(guild, match, teamsByName) != null);
     }
 
     // returns null if the guild should not be alerted about the match
+    // returns an empty list if the guild should be alerted, but its role management is disabled (alert without mentions)
     public List<string>? GetRolesToPing(Guild guild, MatchBase match, Dictionary<string, Team> teamsByName)
     {
-        var matchingRoleDiscordIds = GetMatchingFilterRoleDiscordIds(guild, match, teamsByName);
+        var matchingFilters = GetMatchingFilters(guild, match, teamsByName);
 
-        if (matchingRoleDiscordIds == null)
+        if (matchingFilters == null)
             return null;
 
-        List<string> rolesToPing = [guild.AlertRoleDiscordId!, .. matchingRoleDiscordIds];
+        List<string> rolesToPing = new();
+
+        if (!guild.Settings.RoleManagement)
+            return rolesToPing;
+
+        if (guild.AlertRoleDiscordId != null)
+            rolesToPing.Add(guild.AlertRoleDiscordId);
+
+        foreach (var filter in matchingFilters)
+        {
+            if (filter.RoleDiscordId != null)
+                rolesToPing.Add(filter.RoleDiscordId);
+        }
 
         var linkedRoleDiscordIds = guild.RoleLinks
             .Where(link => rolesToPing.Contains(link.BotRoleDiscordId))
@@ -58,18 +64,19 @@ public class AlertsHelper
         return rolesToPing.Distinct().ToList();
     }
 
-    // returns the roles of all filters the match passes, or null if the match passes none of them
-    private List<string>? GetMatchingFilterRoleDiscordIds(Guild guild, MatchBase match, Dictionary<string, Team> teamsByName)
+    // returns all filters the match passes, or null if the match passes none of them
+    private List<Filter>? GetMatchingFilters(Guild guild, MatchBase match, Dictionary<string, Team> teamsByName)
     {
+        // a guild without filters gets every match
+        // (new guilds start with the default filter, so this only applies to guilds that deleted all of their filters)
         if (guild.Filters.Count == 0)
-            return MatchPassesFilter(match, DefaultFilter, teamsByName) ? new List<string>() : null;
+            return new List<Filter>();
 
-        var matchingRoleDiscordIds = guild.Filters
+        var matchingFilters = guild.Filters
             .Where(filter => MatchPassesFilter(match, filter, teamsByName))
-            .Select(filter => filter.RoleDiscordId)
             .ToList();
 
-        return matchingRoleDiscordIds.Count > 0 ? matchingRoleDiscordIds : null;
+        return matchingFilters.Count > 0 ? matchingFilters : null;
     }
 
     // a filter property that is null means "dont care", all other properties have to fit the match

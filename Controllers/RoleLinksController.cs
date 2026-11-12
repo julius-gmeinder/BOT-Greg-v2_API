@@ -26,6 +26,11 @@ public class RoleLinksController : ControllerBase
         if (guild == null)
             return NotFound();
 
+        // without role management the bot has no roles that could be linked
+        // the other endpoints need no check: disabling the role management deletes all links, so they just return nothing
+        if (!guild.Settings.RoleManagement)
+            return Conflict("roleManagement");
+
         if (!_roles.RoleExists(guild, linkDto.BotRoleDiscordId))
             return NotFound();
 

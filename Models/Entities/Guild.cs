@@ -15,6 +15,7 @@ public class Guild : BaseEntity
     [Required]
     public int GuildMemberCount { get; set; }
 
+    // only set if the role management of the guild is enabled
     [MaxLength(22)]
     public string? AlertRoleDiscordId { get; set; } = null;
 

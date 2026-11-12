@@ -7,5 +7,6 @@ public class FilterDeleteDto
     [Required]
     public string GuildDiscordId { get; set; } = null!;
 
-    public List<string> RoleDiscordIds { get; set; } = new();
+    // filters are identified by their internal id, because they only have a role if the role management is enabled
+    public List<Guid> FilterIds { get; set; } = new();
 }

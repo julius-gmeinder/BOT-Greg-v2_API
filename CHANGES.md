@@ -7,9 +7,10 @@ Everything the bot frontend has to adapt to. Internal changes that the bot does 
 1. Replace the SignalR client with a server-sent-events client (`GET /api/Alerts/stream`).
 2. Remove everything related to news, live matches and stars.
 3. Adapt to the new match / result objects (Liquipedia instead of HLTV).
-4. Filters: `stars` is gone, `eventTier` is a number now, `hltvCoverage` is new.
-5. Guilds without filters only get HLTV-covered matches (default filter).
+4. Filters: `stars` is gone, `eventTier` is a number now, `hltvCoverage` is new. Filters have an `id` and are deleted by it, `roleDiscordId` is optional.
+5. Every new guild starts with a default filter (HLTV-covered matches only), a normal filter that can be deleted. Guilds without filters get every match again. See section 8.
 6. All Discord ids got renamed to `...DiscordId` in request bodies, query parameters and responses (`guildId` -> `guildDiscordId`, `roleId` -> `roleDiscordId`, ...), see section 4.
+7. **Role management is opt-in** (new setting `roleManagement`, default `false`). Without it the bot must not create any role: no alert role, no filter roles, no role links, alerts without mentions. See section 7.
 
 ---
 
@@ -109,7 +110,7 @@ Besides `match` / `result`, only the id names in the `guilds` array changed (`ch
 [{ "result": { ... }, "guilds": [{ "channelDiscordId": "...", "mentionOnResults": true, "censorResults": false, "roleDiscordIds": ["..."] }] }]
 ```
 
-`roleDiscordIds` no longer contains duplicates.
+`roleDiscordIds` no longer contains duplicates. It is an empty array for guilds with disabled role management, the alert has to be sent without any mention then (`mentionOnDelays` / `mentionOnResults` have no effect in that case).
 
 ---
 
@@ -141,15 +142,17 @@ The tables below already use the new names.
 | Endpoint | Change |
 |---|---|
 | `GET api/Alerts/stream` | new, see section 1 |
-| `GET api/Alerts/config` | response without `newsAlertChannelId` |
-| `POST api/Alerts/config` | body without `newsAlertChannelId`. Response: `{ newConfig, filterCount, guildsNextUpcomingMatch }` (without `newsFilterCount` and `guildsLiveMatches`). `newConfig` is the config that is actually saved now (v1 echoed the request body, so `alertRoleId` could be null although a role was set) |
+| `GET api/Alerts/config` | response without `newsAlertChannelId`. `alertRoleDiscordId` is always null if the role management is disabled |
+| `POST api/Alerts/config` | body without `newsAlertChannelId`. Response: `{ newConfig, filterCount, guildsNextUpcomingMatch }` (without `newsFilterCount` and `guildsLiveMatches`). `newConfig` is the config that is actually saved now (v1 echoed the request body, so `alertRoleId` could be null although a role was set). `alertRoleDiscordId` in the body returns `409` with body `roleManagement` if the role management is disabled. The alert role is no longer needed to receive alerts, a channel is enough |
 
 ### Filters
 
 | Endpoint | Change |
 |---|---|
-| `GET api/Filters` | filter: `{ nr, roleDiscordId, team, event, eventTier, eventTierString, vrsRank, hltvCoverage }` |
-| `POST api/Filters` | body: `{ guildDiscordId, roleDiscordId, team?, event?, eventTier?, vrsRank?, hltvCoverage? }` |
+| `GET api/Filters` | filter: `{ id, nr, roleDiscordId, team, event, eventTier, eventTierString, vrsRank, hltvCoverage }`. `id` is the internal id (Guid) of the filter, `roleDiscordId` is null if the role management is disabled |
+| `GET api/Filters/roles` | only contains the roles of filters that have one (empty if the role management is disabled) |
+| `POST api/Filters` | body: `{ guildDiscordId, roleDiscordId?, team?, event?, eventTier?, vrsRank?, hltvCoverage? }` |
+| `DELETE api/Filters` | body: `{ guildDiscordId, filterIds: ["<id>"] }` (v1: `roleIds`). Response is still the list of role ids the bot has to delete in Discord (empty if the role management is disabled) |
 
 - `stars` removed.
 - `eventTier` is a number (`0` - `4`) instead of a string. The match has to be in this tier or above.
@@ -158,7 +161,8 @@ The tables below already use the new names.
 - `vrsRank` has to be between 1 and 1000 (v1: 500).
 - `team` and `event` have to be the Liquipedia names (the `value` of the autocomplete endpoints). HLTV names from v1 will not match.
 - Invalid values still return `400`, but the body is a validation problem object (`{ errors: { ... } }`) now.
-- Deleting filters (`DELETE api/Filters`) also deletes the role links of the deleted filter roles.
+- Deleting filters (`DELETE api/Filters`) also deletes the role links of the deleted filter roles. Unknown ids are ignored.
+- `roleDiscordId` of `POST api/Filters` depends on the role management of the guild: enabled = required (`400` with body `roleRequired` if missing), disabled = must not be set (`409` with body `roleManagement`). So the bot only creates the filter role if the role management is enabled.
 
 ### Autocomplete
 
@@ -174,23 +178,38 @@ The tables below already use the new names.
 
 | Endpoint | Change |
 |---|---|
-| `POST api/Guilds`, `POST api/Guilds/sync` | guild data: `{ guildDiscordId, guildName, guildMemberCount }` (no `guildOwner`) |
+| `POST api/Guilds`, `POST api/Guilds/sync` | guild data: `{ guildDiscordId, guildName, guildMemberCount }` (no `guildOwner`). Every added guild gets the default filter (section 8) |
+| `PUT api/Guilds/reset` | still returns the role ids to delete (empty if the role management was disabled). Also disables the role management and adds the default filter again, so the guild is in the same state as a new guild |
 
 ### RoleLinks
 
 | Endpoint | Change |
 |---|---|
-| `POST api/RoleLinks` | `botRoleDiscordId` has to be a bot role of the given guild (alert role or filter role), otherwise `404`. v1 accepted bot roles of any guild |
+| `POST api/RoleLinks` | `botRoleDiscordId` has to be a bot role of the given guild (alert role or filter role), otherwise `404`. v1 accepted bot roles of any guild. Returns `409` with body `roleManagement` if the role management is disabled |
+| `GET api/RoleLinks/tree`, `bot`, `linked` | empty if the role management is disabled (disabling it deletes all links) |
+
+### Roles
+
+| Endpoint | Change |
+|---|---|
+| `GET api/Roles` | empty if the role management is disabled |
+| `GET api/Roles/default` | `404` if the role management is disabled |
 
 ### Settings
 
 `ToggleMentionOnDelays`, `ToggleMentionOnResults`, `ToggleCensorResults` and `TogglePauseAlerts` are unchanged. The two news toggles are removed. (The settings are stored in their own table now, see section 6, the bot does not notice that.)
 
+| Endpoint | Change |
+|---|---|
+| `GET api/Settings?guildDiscordId=` | new. `{ alertsPaused, mentionOnDelays, mentionOnResults, censorResults, roleManagement }`, `404` for unknown guilds |
+| `PATCH api/Settings/ToggleRoleManagement` | new, see section 7 |
+
 ---
 
 ## 5. Changed behavior
 
-- **Default filter:** Liquipedia covers a lot more matches than HLTV. Guilds without filters got every match in v1, in v2 they only get matches and results that are covered by HLTV (`isHltvCovered`). As soon as a guild has at least one filter, only its own filters count. A filter without any property (only `roleDiscordId`) matches everything.
+- **Default filter:** Liquipedia covers a lot more matches than HLTV, so every new guild starts with a filter that only lets HLTV-covered matches through (section 8). Guilds without filters get every match and result, same as in v1. A filter without any property matches everything.
+- **Roles are optional:** a guild only needs a channel to get alerts, the alert role is no longer required (section 7).
 - **Linked roles:** roles linked to the alert role are pinged for guilds without filters too (v1 only added them if the guild had filters).
 - **Match alerts:** sent for matches that start within the next 5 minutes, once per match.
 - **Match delays:** sent when an already alerted match is upcoming again with a different start time. v1 only looked at the next 6 hours, v2 looks at all fetched matches (next 25 hours).
@@ -203,20 +222,122 @@ The tables below already use the new names.
 
 ## 6. Database
 
-New database, the tables of v1 are not migrated. Run `dotnet ef database update` (or `Update-Database`) to apply the new migrations `AddedAlertTables`, `MovedSettingsToGuildSettings` and `RenamedDiscordIds` (only renames columns and an index, no data is lost).
+New database, the tables of v1 are not migrated. Run `dotnet ef database update` (or `Update-Database`) to apply the new migrations `AddedAlertTables`, `MovedSettingsToGuildSettings`, `RenamedDiscordIds` (only renames columns and an index, no data is lost) and `AddedRoleManagement`.
 
 - Every table has a GuidV7 `Id` as primary key, plus `CreatedAt` and `UpdatedAt` (`BaseEntity`).
 - Discord ids are normal columns named `...DiscordId` (`Guilds.DiscordId`, `Guilds.AlertRoleDiscordId`, `Filters.RoleDiscordId`, `RoleLinks.BotRoleDiscordId`, ...). `Guilds.DiscordId` is unique.
 - Settings, filters and role links reference the guild by its internal `Id` (foreign key column `GuildId`, cascade delete). `GuildId` is always the internal Guid, never the Discord id.
 - Tables: `Guilds`, `GuildSettings`, `Filters`, `RoleLinks`, `HistoryMatchAlerts`, `HistoryResultAlerts`.
-- `Guilds` only holds the guild data and the alert config (`AlertRoleDiscordId`, `MatchAlertsChannelDiscordId`, `ResultAlertsChannelDiscordId`). The settings (`AlertsPaused`, `MentionOnDelays`, `MentionOnResults`, `CensorResults`) are in `GuildSettings`, one row per guild (`GuildSettings.GuildId` is unique). Every new guild gets its settings row with the defaults when it is created.
+- `Guilds` only holds the guild data and the alert config (`AlertRoleDiscordId`, `MatchAlertsChannelDiscordId`, `ResultAlertsChannelDiscordId`). The settings (`AlertsPaused`, `MentionOnDelays`, `MentionOnResults`, `CensorResults`, `RoleManagement`) are in `GuildSettings`, one row per guild (`GuildSettings.GuildId` is unique). Every new guild gets its settings row with the defaults and its default filter when it is created.
+- `AddedRoleManagement` adds `GuildSettings.RoleManagement` (default `false`) and makes `Filters.RoleDiscordId` nullable. Already existing guilds are migrated so nothing changes for them: guilds that already have an alert role or filters (and therefore roles) get `RoleManagement = true`, guilds without filters get the default filter as a row. Reverting the migration deletes all filters without role.
+- One leftover of that migration: an existing guild with an alert role but without filters has `RoleManagement = true` and a default filter without role. The api handles that (the filter just pings no extra role), disabling and enabling the role management once gives the filter its role.
 - `MovedSettingsToGuildSettings` copies the settings of already existing guilds from the old `Guilds` columns into `GuildSettings` before it drops the columns (and back, when it is reverted).
 - Removed tables: `FiltersNews`, `HistoryNewsAlerts` and all `HLTV_*` tables. Matches, results, events and teams are no longer stored, they come from the (cached) `LiquipediaService`.
 - `HistoryMatchAlerts` / `HistoryResultAlerts` use the Liquipedia `MatchId` (unique) instead of the HLTV url.
 
 ---
 
-## 7. Internal changes (not relevant for the bot)
+## 7. Role management (opt-in)
+
+New setting `roleManagement` per guild, default `false`. It controls every role the bot creates: the alert role and the one role per filter. Role links only exist with role management.
+
+| | disabled (default) | enabled |
+|---|---|---|
+| Alert role | none (`alertRoleDiscordId` is null) | exists, created when the setting is enabled |
+| Filters | no role (`roleDiscordId` is null) | one role per filter, like in v1 |
+| Role links | none, can not be created | like in v1 |
+| Alerts | `roleDiscordIds` is empty -> no mention | `roleDiscordIds` = alert role + roles of the matching filters + linked roles |
+| `Manage Roles` permission | not needed | needed |
+
+The api never talks to Discord. The bot creates and deletes the roles, the api only tells it which ones.
+
+### Enabling
+
+1. `GET api/Filters` to get the filters of the guild (the default filter is one of them).
+2. Create the alert role and one role per filter in Discord.
+3. Send all of them in one request:
+
+```jsonc
+// PATCH api/Settings/ToggleRoleManagement
+{
+  "guildDiscordId": "...",
+  "newValue": true,
+  "alertRoleDiscordId": "...",
+  "filterRoles": [{ "filterId": "<id of the filter>", "roleDiscordId": "..." }]
+}
+
+// 200
+{ "roleManagement": true, "roleDiscordIdsToDelete": [] }
+```
+
+If the request fails, nothing was saved and the bot has to delete the roles it just created (same as v1 does when adding a filter fails).
+
+### Disabling
+
+```jsonc
+// PATCH api/Settings/ToggleRoleManagement
+{ "guildDiscordId": "...", "newValue": false }
+
+// 200, the bot has to delete these roles in Discord
+{ "roleManagement": false, "roleDiscordIdsToDelete": ["<alert role>", "<filter role>", "..."] }
+```
+
+The api removes the alert role, the roles of all filters and all role links of the guild. The filters themselves stay.
+
+### Status codes of `ToggleRoleManagement`
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `{ roleManagement, roleDiscordIdsToDelete }` | toggled |
+| `404` | | unknown guild |
+| `409` | | the setting already has this value (same as the other toggles) |
+| `400` | `alertRoleRequired` | enabling without `alertRoleDiscordId` |
+| `400` | `filterRoles` | enabling, but `filterRoles` does not contain exactly one role for every filter of the guild (e. g. a filter was added or deleted in the meantime) |
+
+### Locked while disabled
+
+| Request | Response |
+|---|---|
+| `POST api/Filters` with `roleDiscordId` | `409`, body `roleManagement` |
+| `POST api/Alerts/config` with `alertRoleDiscordId` | `409`, body `roleManagement` |
+| `POST api/RoleLinks` | `409`, body `roleManagement` |
+
+Everything else needs no lock, it just returns nothing: `GET api/Roles`, `GET api/Filters/roles`, `GET api/RoleLinks/tree` / `bot` / `linked` are empty, `GET api/Roles/default` and `DELETE api/RoleLinks` return `404`.
+
+### What has to change in the bot (hints)
+
+The bot should read `roleManagement` from `GET api/Settings` instead of guessing it from the roles.
+
+| Where (v1 file) | Change |
+|---|---|
+| `commands/settings` | new command for the setting. Check `Manage Roles` before enabling. Enabling = create roles, then call the api. Disabling = call the api, then delete the returned roles (ask for confirmation, members lose these roles) |
+| `commands/alerts/config.ts` | no longer creates the alert role (it exists if and only if the role management is enabled) and does not need `Manage Roles` anymore. Never send `alertRoleDiscordId` while disabled. The alert role section of the container should show the role, or a hint how to enable the role management |
+| `commands/filters/add` | only create the filter role (and check `Manage Roles`) if enabled, otherwise send the filter without `roleDiscordId`. The success message can not show a role mention then |
+| `commands/filters/list.ts` | `roleDiscordId` can be null, show the filter without role mention |
+| `commands/filters/delete.ts` | the select menu has to be built from `GET api/Filters` (value = `id`, label = properties of the filter or its role name) instead of the role ids, and sends `filterIds`. The permission check is only needed if roles have to be deleted |
+| `commands/misc/roles.ts` | no roles to choose if disabled, the message should say that the role management is disabled (v1: "Alerts are currently not configured") |
+| `commands/role/*` (link, unlink, list) | locked if disabled, show a hint instead of the select menus |
+| `commands/misc/reset.ts` | `Manage Roles` is only needed if the returned list is not empty. The text should mention that the default filter comes back |
+| alert services (`matchAlertsService`, `matchDelaysService`, `resultAlertsService`) | `roleDiscordIds` can be empty, send the message without mention then (no empty mention string) |
+| `commands/misc/commands.ts` / help texts | mention that roles are optional and how to enable them |
+
+---
+
+## 8. Default filter
+
+The default filter is no longer applied in code, it is a real row in `Filters`: `{ hltvCoverage: true }`, everything else null.
+
+- It is added when a guild is created (`POST api/Guilds`, `POST api/Guilds/sync`) and when a guild is reset (`PUT api/Guilds/reset`).
+- It is a normal filter in every way: part of `GET api/Filters` (usually `nr` 1), counts towards the limit of 20 filters and the duplicate check (adding `{ hltvCoverage: true }` again returns `409 duplicate`), gets its own role when the role management is enabled, and can be deleted with `DELETE api/Filters`.
+- There is no flag that marks it. If the bot wants to label it ("default"), it can check for `hltvCoverage === true` with all other properties null.
+- Deleting it has a consequence the bot should point out: a guild without any filter gets **every** match and result Liquipedia knows (a lot more than HLTV covered). With other filters left, only those count.
+- It can be added again like every other filter (`POST api/Filters` with `hltvCoverage: true`).
+
+UI hints: the texts in `alerts/config.ts` that depend on `filterCount === 0` ("you will get an alert for every match") are still correct, but new guilds have `filterCount` 1 now. `filters/list.ts` no longer hits the "no filters" case for new guilds.
+
+---
+
+## 9. Internal changes (not relevant for the bot)
 
 - `LiquipediaService`: cache time of matches and results is 5 minutes (was 3). All `Get...Async` methods have an optional `refetch` parameter, that skips the cache and replaces the cached data.
 - `BackgroundWorker`: runs every 5 minutes (synced to the clock), refetches matches and results once and passes them to `MatchDelaysService`, `MatchAlertsService` and `ResultAlertsService`. An exception in a run is logged and does not stop the worker.
@@ -224,6 +345,9 @@ New database, the tables of v1 are not migrated. Run `dotnet ef database update`
 - `AlertsHelper` has one filter comparison for matches and results (v1 had a copy for upcoming matches, live matches and results). Guilds, settings, filters and role links are loaded with one query per run instead of one query per guild / role.
 - `AlertStreamService` (singleton) holds the connected stream clients, `AlertStreamHeartbeat` sends the heartbeat.
 - Repos take the already loaded `Guild` instead of loading it a second time by its id.
+- `AlertsHelper` no longer has a hardcoded default filter. `GetRolesToPing` returns an empty list for guilds with disabled role management (null still means "do not alert").
+- `AlertsRepo` no longer requires an alert role for alert guilds, only the channel.
+- `RolesRepo` enables / disables the role management (`EnableRoleManagementAsync`, `DisableRoleManagementAsync`), `GuildsRepo` creates the default filter (`CreateDefaultFilter`).
 - `MatchBase` has the new computed properties `Tier`, `TierString` and `IsHltvCovered`.
 - The validation of request bodies moved from the controllers to attributes of the DTOs.
 - AutoMapper, SignalR, Playwright and HtmlAgilityPack are no longer used.

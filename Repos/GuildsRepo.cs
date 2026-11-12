@@ -42,6 +42,9 @@ public class GuildsRepo
         _db.Filters.RemoveRange(guild.Filters.ToList());
         _db.RoleLinks.RemoveRange(guild.RoleLinks.ToList());
 
+        // a reset guild is in the same state as a guild that just got added
+        _db.Filters.Add(CreateDefaultFilter(guild));
+
         guild.AlertRoleDiscordId = null;
 
         // alerts
@@ -53,6 +56,7 @@ public class GuildsRepo
         guild.Settings.MentionOnDelays = false;
         guild.Settings.MentionOnResults = true;
         guild.Settings.CensorResults = false;
+        guild.Settings.RoleManagement = false;
 
         await _db.SaveChangesAsync();
     }
@@ -100,7 +104,8 @@ public class GuildsRepo
         guild.MatchAlertsChannelDiscordId = configDto.MatchAlertChannelDiscordId;
         guild.ResultAlertsChannelDiscordId = configDto.ResultAlertChannelDiscordId;
 
-        // the alert role can only be replaced, not removed
+        // the alert role can only be replaced, not removed (it gets removed when the role management is disabled)
+        // the controller makes sure, that it is only set if the role management is enabled
         if (configDto.AlertRoleDiscordId != null)
             guild.AlertRoleDiscordId = configDto.AlertRoleDiscordId;
 
@@ -108,14 +113,42 @@ public class GuildsRepo
         return GetGuildsConfig(guild);
     }
 
+    public GuildSettingsDto GetGuildsSettings(Guild guild)
+    {
+        return new GuildSettingsDto()
+        {
+            AlertsPaused = guild.Settings.AlertsPaused,
+            MentionOnDelays = guild.Settings.MentionOnDelays,
+            MentionOnResults = guild.Settings.MentionOnResults,
+            CensorResults = guild.Settings.CensorResults,
+            RoleManagement = guild.Settings.RoleManagement
+        };
+    }
+
     private Guild CreateGuild(GuildDataDto guildDto)
     {
-        return new Guild()
+        Guild guild = new()
         {
             DiscordId = guildDto.GuildDiscordId,
             GuildName = guildDto.GuildName,
             GuildMemberCount = guildDto.GuildMemberCount,
             Settings = new GuildSettings()
+        };
+
+        guild.Filters.Add(CreateDefaultFilter(guild));
+
+        return guild;
+    }
+
+    // liquipedia covers a lot more matches than hltv did, so every new guild starts with a filter for the matches that are also covered by hltv
+    // it is a normal filter, that can be deleted like every other filter (a guild without filters gets all matches)
+    // it has no role, because the role management of a new guild is disabled
+    private Filter CreateDefaultFilter(Guild guild)
+    {
+        return new Filter()
+        {
+            HltvCoverage = true,
+            Guild = guild
         };
     }
 }

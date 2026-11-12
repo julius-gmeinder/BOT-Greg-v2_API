@@ -37,11 +37,26 @@ public class FiltersRepo
 
     public async Task<List<string>> RemoveFiltersAsync(FilterDeleteDto filterDto)
     {
-        var filters = await _db.Filters
-            .Where(x => x.Guild.DiscordId == filterDto.GuildDiscordId && filterDto.RoleDiscordIds.Contains(x.RoleDiscordId))
-            .ToListAsync();
+        var guildsFilters = await GetFiltersAsync(filterDto.GuildDiscordId);
 
-        var roleDiscordIdsToDelete = filters.Select(x => x.RoleDiscordId).ToList();
+        var filters = guildsFilters.Where(x => filterDto.FilterIds.Contains(x.Id)).ToList();
+        var remainingFilters = guildsFilters.Except(filters).ToList();
+
+        // filters only have a role if the role management is enabled
+        // a role that is still used by a remaining filter must not be deleted
+        List<string> roleDiscordIdsToDelete = new();
+
+        foreach (var filter in filters)
+        {
+            if (filter.RoleDiscordId == null)
+                continue;
+
+            if (remainingFilters.Any(x => x.RoleDiscordId == filter.RoleDiscordId))
+                continue;
+
+            if (!roleDiscordIdsToDelete.Contains(filter.RoleDiscordId))
+                roleDiscordIdsToDelete.Add(filter.RoleDiscordId);
+        }
 
         // the roles get deleted, so their links would point to nothing
         var roleLinks = await _db.RoleLinks

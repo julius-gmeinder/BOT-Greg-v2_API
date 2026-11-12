@@ -44,6 +44,10 @@ public class AlertsController : ControllerBase
         if (guild == null)
             return NotFound();
 
+        // without role management there is no alert role, the alerts are sent without mentions
+        if (configDto.AlertRoleDiscordId != null && !guild.Settings.RoleManagement)
+            return Conflict("roleManagement");
+
         AlertConfigResDto res = new()
         {
             NewConfig = await _guilds.SetGuildsConfigAsync(guild, configDto),

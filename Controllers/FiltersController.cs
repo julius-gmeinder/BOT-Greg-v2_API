@@ -31,6 +31,7 @@ public class FiltersController : ControllerBase
         {
             filterDtos.Add(new FilterDto()
             {
+                Id = filter.Id,
                 Nr = filterDtos.Count + 1,
                 RoleDiscordId = filter.RoleDiscordId,
                 Team = filter.Team,
@@ -52,7 +53,9 @@ public class FiltersController : ControllerBase
             return NotFound();
 
         var filters = await _filters.GetFiltersAsync(guildDiscordId);
-        var filterRoleDiscordIds = filters.Select(x => x.RoleDiscordId);
+
+        // filters only have a role if the role management is enabled, so the list is empty if it is disabled
+        var filterRoleDiscordIds = filters.Where(x => x.RoleDiscordId != null).Select(x => x.RoleDiscordId);
 
         return Ok(filterRoleDiscordIds);
     }
@@ -64,6 +67,13 @@ public class FiltersController : ControllerBase
         var guild = await _guilds.GetGuildAsync(filterDto.GuildDiscordId);
         if (guild == null)
             return NotFound();
+
+        // the bot only creates a role for the filter if the role management is enabled
+        if (guild.Settings.RoleManagement && filterDto.RoleDiscordId == null)
+            return BadRequest("roleRequired");
+
+        if (!guild.Settings.RoleManagement && filterDto.RoleDiscordId != null)
+            return Conflict("roleManagement");
 
         var filters = await _filters.GetFiltersAsync(filterDto.GuildDiscordId);
         if (filters.Count >= Constants.MaxFiltersPerGuild)
@@ -83,6 +93,7 @@ public class FiltersController : ControllerBase
         return NoContent();
     }
 
+    // returns the roles of the deleted filters, the bot has to delete them in discord (empty if the role management is disabled)
     [HttpDelete("")]
     public async Task<IActionResult> RemoveFiltersAsync([FromBody] FilterDeleteDto filterDto)
     {

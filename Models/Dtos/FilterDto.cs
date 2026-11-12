@@ -4,9 +4,12 @@ namespace BOT_Greg_v2_API.Models.Dtos;
 
 public class FilterDto
 {
+    public Guid Id { get; set; }
+
     public int Nr { get; set; }
 
-    public string RoleDiscordId { get; set; } = null!;
+    // null if the role management of the guild is disabled
+    public string? RoleDiscordId { get; set; }
 
     public string? Team { get; set; }
 

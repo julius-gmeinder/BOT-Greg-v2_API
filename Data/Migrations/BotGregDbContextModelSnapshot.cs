@@ -48,7 +48,6 @@ namespace BOT_Greg_v2_API.Data.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<string>("RoleDiscordId")
-                        .IsRequired()
                         .HasMaxLength(22)
                         .HasColumnType("varchar(22)");
 
@@ -135,6 +134,9 @@ namespace BOT_Greg_v2_API.Data.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("MentionOnResults")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("RoleManagement")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("UpdatedAt")
