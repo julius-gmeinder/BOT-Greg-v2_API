@@ -37,7 +37,8 @@ public class RolesRepo
     }
 
     // the roles were already created in discord by the bot, the api only saves which role belongs to what
-    public async Task EnableRoleManagementAsync(Guild guild, string alertRoleDiscordId, List<ToggleRoleManagementDto.FilterRole> filterRoles)
+    // does not save, the caller saves it together with the other settings
+    public void EnableRoleManagement(Guild guild, string alertRoleDiscordId, List<FilterRoleDto> filterRoles)
     {
         guild.AlertRoleDiscordId = alertRoleDiscordId;
 
@@ -48,12 +49,11 @@ public class RolesRepo
         }
 
         guild.Settings.RoleManagement = true;
-
-        await _db.SaveChangesAsync();
     }
 
     // returns the roles that are no longer needed, the bot has to delete them in discord
-    public async Task<List<string>> DisableRoleManagementAsync(Guild guild)
+    // does not save, the caller saves it together with the other settings
+    public List<string> DisableRoleManagement(Guild guild)
     {
         var roleDiscordIdsToDelete = GetAllRoleDiscordIds(guild).Distinct().ToList();
 
@@ -66,8 +66,6 @@ public class RolesRepo
         _db.RoleLinks.RemoveRange(guild.RoleLinks.ToList());
 
         guild.Settings.RoleManagement = false;
-
-        await _db.SaveChangesAsync();
 
         return roleDiscordIdsToDelete;
     }

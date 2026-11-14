@@ -125,6 +125,16 @@ public class GuildsRepo
         };
     }
 
+    // the role management is not set here, as roles have to be saved / removed with it (see RolesRepo)
+    // does not save, the caller saves it together with the role management
+    public void SetGuildsSettings(Guild guild, GuildSettingsDto settingsDto)
+    {
+        guild.Settings.AlertsPaused = settingsDto.AlertsPaused;
+        guild.Settings.MentionOnDelays = settingsDto.MentionOnDelays;
+        guild.Settings.MentionOnResults = settingsDto.MentionOnResults;
+        guild.Settings.CensorResults = settingsDto.CensorResults;
+    }
+
     private Guild CreateGuild(GuildDataDto guildDto)
     {
         Guild guild = new()

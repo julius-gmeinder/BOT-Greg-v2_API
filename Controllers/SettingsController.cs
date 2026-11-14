@@ -1,6 +1,5 @@
-﻿using BOT_Greg_v2_API.Data;
+using BOT_Greg_v2_API.Data;
 using BOT_Greg_v2_API.Models.Dtos;
-using BOT_Greg_v2_API.Models.Entities;
 using BOT_Greg_v2_API.Repos;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,81 +30,45 @@ public class SettingsController : ControllerBase
         return Ok(_guilds.GetGuildsSettings(guild));
     }
 
-    [HttpPatch("ToggleMentionOnDelays")]
-    public async Task<IActionResult> ToggleMentionOnDelaysAsync([FromBody] ToggleSettingDto toggleDto)
+    [HttpPost("")]
+    public async Task<IActionResult> SetSettingsAsync([FromQuery] string guildDiscordId, [FromBody] GuildSettingsSetDto settingsDto)
     {
-        return await ToggleSettingAsync(toggleDto, settings => settings.MentionOnDelays, (settings, value) => settings.MentionOnDelays = value);
-    }
-
-    [HttpPatch("ToggleMentionOnResults")]
-    public async Task<IActionResult> ToggleMentionOnResultsAsync([FromBody] ToggleSettingDto toggleDto)
-    {
-        return await ToggleSettingAsync(toggleDto, settings => settings.MentionOnResults, (settings, value) => settings.MentionOnResults = value);
-    }
-
-    [HttpPatch("ToggleCensorResults")]
-    public async Task<IActionResult> ToggleCensorResultsAsync([FromBody] ToggleSettingDto toggleDto)
-    {
-        return await ToggleSettingAsync(toggleDto, settings => settings.CensorResults, (settings, value) => settings.CensorResults = value);
-    }
-
-    [HttpPatch("TogglePauseAlerts")]
-    public async Task<IActionResult> TogglePauseAlertsAsync([FromBody] ToggleSettingDto toggleDto)
-    {
-        return await ToggleSettingAsync(toggleDto, settings => settings.AlertsPaused, (settings, value) => settings.AlertsPaused = value);
-    }
-
-    // toggling the role management is more than flipping a value, as all roles of the bot depend on it:
-    // enabling:  the bot creates the alert role and one role per filter in discord first, then sends their ids
-    // disabling: the api removes all roles and role links, and returns the roles the bot has to delete in discord
-    [HttpPatch("ToggleRoleManagement")]
-    public async Task<IActionResult> ToggleRoleManagementAsync([FromBody] ToggleRoleManagementDto toggleDto)
-    {
-        var guild = await _guilds.GetGuildAsync(toggleDto.GuildDiscordId);
+        var guild = await _guilds.GetGuildAsync(guildDiscordId);
         if (guild == null)
             return NotFound();
 
-        if (toggleDto.NewValue == guild.Settings.RoleManagement)
-            return Conflict();
+        bool enablesRoleManagement = settingsDto.RoleManagement && !guild.Settings.RoleManagement;
+        bool disablesRoleManagement = !settingsDto.RoleManagement && guild.Settings.RoleManagement;
 
-        ToggleRoleManagementResDto res = new()
-        {
-            RoleManagement = toggleDto.NewValue
-        };
+        if (settingsDto.RoleManagement && !enablesRoleManagement && (settingsDto.AlertRoleDiscordId != null || settingsDto.FilterRoles.Count > 0))
+            return Conflict("roleManagement");
 
-        if (!toggleDto.NewValue)
+        if (enablesRoleManagement)
         {
-            res.RoleDiscordIdsToDelete = await _roles.DisableRoleManagementAsync(guild);
-            return Ok(res);
+            if (settingsDto.AlertRoleDiscordId == null)
+                return BadRequest("alertRoleRequired");
+
+            var filterIds = guild.Filters.Select(x => x.Id).ToList();
+            var filterIdsWithRole = settingsDto.FilterRoles.Select(x => x.FilterId).ToList();
+
+            bool everyFilterHasOneRole = filterIdsWithRole.Count == filterIds.Count && filterIds.All(id => filterIdsWithRole.Contains(id));
+            if (!everyFilterHasOneRole)
+                return BadRequest("filterRoles");
         }
 
-        if (toggleDto.AlertRoleDiscordId == null)
-            return BadRequest("alertRoleRequired");
+        GuildSettingsResDto res = new();
 
-        // every filter of the guild needs exactly one role, otherwise filters without role would be left over
-        var filterIds = guild.Filters.Select(x => x.Id).ToList();
-        var filterIdsWithRole = toggleDto.FilterRoles.Select(x => x.FilterId).ToList();
+        _guilds.SetGuildsSettings(guild, settingsDto);
 
-        bool everyFilterHasOneRole = filterIdsWithRole.Count == filterIds.Count && filterIds.All(id => filterIdsWithRole.Contains(id));
-        if (!everyFilterHasOneRole)
-            return BadRequest("filterRoles");
+        if (enablesRoleManagement)
+            _roles.EnableRoleManagement(guild, settingsDto.AlertRoleDiscordId!, settingsDto.FilterRoles);
 
-        await _roles.EnableRoleManagementAsync(guild, toggleDto.AlertRoleDiscordId, toggleDto.FilterRoles);
-        return Ok(res);
-    }
+        if (disablesRoleManagement)
+            res.RoleDiscordIdsToDelete = _roles.DisableRoleManagement(guild);
 
-    // all other settings are toggled the same way, they only differ in the property of the guild settings that is read and set
-    private async Task<IActionResult> ToggleSettingAsync(ToggleSettingDto toggleDto, Func<GuildSettings, bool> getSetting, Action<GuildSettings, bool> setSetting)
-    {
-        var guild = await _guilds.GetGuildAsync(toggleDto.GuildDiscordId);
-        if (guild == null)
-            return NotFound();
-
-        if (toggleDto.NewValue == getSetting(guild.Settings))
-            return Conflict();
-
-        setSetting(guild.Settings, toggleDto.NewValue);
         await _db.SaveChangesAsync();
-        return NoContent();
+
+        res.NewSettings = _guilds.GetGuildsSettings(guild);
+        return Ok(res);
     }
 }

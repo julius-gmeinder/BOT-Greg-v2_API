@@ -11,6 +11,7 @@ Everything the bot frontend has to adapt to. Internal changes that the bot does 
 5. Every new guild starts with a default filter (HLTV-covered matches only), a normal filter that can be deleted. Guilds without filters get every match again. See section 8.
 6. All Discord ids got renamed to `...DiscordId` in request bodies, query parameters and responses (`guildId` -> `guildDiscordId`, `roleId` -> `roleDiscordId`, ...), see section 4.
 7. **Role management is opt-in** (new setting `roleManagement`, default `false`). Without it the bot must not create any role: no alert role, no filter roles, no role links, alerts without mentions. See section 7.
+8. **Settings are read and set as a whole** (`GET` / `POST api/Settings`, like the alert config). All `api/Settings/Toggle...` endpoints are gone. See section 4 (Settings) and section 7.
 
 ---
 
@@ -124,7 +125,7 @@ Every Discord id is called `...DiscordId` now, so it can't be mixed up with the 
 
 | v1 | v2 | Where |
 |---|---|---|
-| `guildId` | `guildDiscordId` | query parameter of every endpoint that takes a guild, bodies of `api/Guilds` (+ `sync`), `api/Filters`, `api/RoleLinks`, `api/Settings/*` |
+| `guildId` | `guildDiscordId` | query parameter of every endpoint that takes a guild, bodies of `api/Guilds` (+ `sync`), `api/Filters`, `api/RoleLinks` |
 | `roleId` | `roleDiscordId` | filters (`GET` / `POST api/Filters`) |
 | `roleIds` | `roleDiscordIds` | body of `DELETE api/Filters`, `guilds` of the alert events |
 | `botRoleId` | `botRoleDiscordId` | bodies of `POST` / `DELETE api/RoleLinks`, query parameter of `GET api/RoleLinks/linked`, `GET api/RoleLinks/tree` |
@@ -197,12 +198,47 @@ The tables below already use the new names.
 
 ### Settings
 
-`ToggleMentionOnDelays`, `ToggleMentionOnResults`, `ToggleCensorResults` and `TogglePauseAlerts` are unchanged. The two news toggles are removed. (The settings are stored in their own table now, see section 6, the bot does not notice that.)
+The settings work like the alert config now: one endpoint to get all of them, one to set all of them. The single toggles are removed.
+(The settings are stored in their own table, see section 6, the bot does not notice that.)
 
 | Endpoint | Change |
 |---|---|
 | `GET api/Settings?guildDiscordId=` | new. `{ alertsPaused, mentionOnDelays, mentionOnResults, censorResults, roleManagement }`, `404` for unknown guilds |
-| `PATCH api/Settings/ToggleRoleManagement` | new, see section 7 |
+| `POST api/Settings?guildDiscordId=` | new, sets all settings at once (see below) |
+| `PATCH api/Settings/ToggleMentionOnDelays`, `ToggleMentionOnResults`, `ToggleCensorResults`, `TogglePauseAlerts` | removed, use `POST api/Settings` |
+| `PATCH api/Settings/ToggleMentionOnNews`, `ToggleAlwaysShowNewsImage` | removed (no news) |
+
+```jsonc
+// POST api/Settings?guildDiscordId=...
+{
+  "alertsPaused": false,
+  "mentionOnDelays": false,
+  "mentionOnResults": true,
+  "censorResults": false,
+  "roleManagement": false
+}
+
+// 200
+{
+  "newSettings": { "alertsPaused": false, "mentionOnDelays": false, "mentionOnResults": true, "censorResults": false, "roleManagement": false },
+  "roleDiscordIdsToDelete": []
+}
+```
+
+- All five settings are required. A missing one returns `400` (validation problem object), it is never silently set to `false`. So the bot reads the settings with `GET`, changes what it wants and sends everything back.
+- The guild is a query parameter (`guildDiscordId`), not part of the body (same as `POST api/Alerts/config`).
+- Settings that already have the sent value just stay. There is no `409` for "already has this value" anymore, sending the unchanged settings returns `200`.
+- `newSettings` is what is actually saved now.
+- `roleManagement` is the only setting that needs more than its value: enabling it needs the role ids in the same body (`alertRoleDiscordId`, `filterRoles`), disabling it fills `roleDiscordIdsToDelete`. See section 7.
+- The request is all or nothing: if it fails (e. g. because of the roles), none of the settings is saved.
+
+| Status | Body | Meaning |
+|---|---|---|
+| `200` | `{ newSettings, roleDiscordIdsToDelete }` | saved |
+| `400` | validation problem object | a setting is missing / invalid body |
+| `400` | `alertRoleRequired`, `filterRoles` | role management gets enabled without (all of) its roles, see section 7 |
+| `404` | | unknown guild |
+| `409` | `roleManagement` | roles were sent, but the role management is enabled already, see section 7 |
 
 ---
 
@@ -255,44 +291,53 @@ The api never talks to Discord. The bot creates and deletes the roles, the api o
 
 1. `GET api/Filters` to get the filters of the guild (the default filter is one of them).
 2. Create the alert role and one role per filter in Discord.
-3. Send all of them in one request:
+3. Send all of them together with the settings:
 
 ```jsonc
-// PATCH api/Settings/ToggleRoleManagement
+// POST api/Settings?guildDiscordId=...
 {
-  "guildDiscordId": "...",
-  "newValue": true,
+  "alertsPaused": false,
+  "mentionOnDelays": false,
+  "mentionOnResults": true,
+  "censorResults": false,
+  "roleManagement": true,
   "alertRoleDiscordId": "...",
   "filterRoles": [{ "filterId": "<id of the filter>", "roleDiscordId": "..." }]
 }
 
 // 200
-{ "roleManagement": true, "roleDiscordIdsToDelete": [] }
+{ "newSettings": { ..., "roleManagement": true }, "roleDiscordIdsToDelete": [] }
 ```
 
-If the request fails, nothing was saved and the bot has to delete the roles it just created (same as v1 does when adding a filter fails).
+`alertRoleDiscordId` and `filterRoles` are only needed (and only allowed) in a request that turns the role management from off to on. Leave them out in every other request.
+
+If the request fails, nothing was saved (also none of the other settings) and the bot has to delete the roles it just created (same as v1 does when adding a filter fails).
 
 ### Disabling
 
 ```jsonc
-// PATCH api/Settings/ToggleRoleManagement
-{ "guildDiscordId": "...", "newValue": false }
+// POST api/Settings?guildDiscordId=...
+{ "alertsPaused": false, "mentionOnDelays": false, "mentionOnResults": true, "censorResults": false, "roleManagement": false }
 
 // 200, the bot has to delete these roles in Discord
-{ "roleManagement": false, "roleDiscordIdsToDelete": ["<alert role>", "<filter role>", "..."] }
+{ "newSettings": { ..., "roleManagement": false }, "roleDiscordIdsToDelete": ["<alert role>", "<filter role>", "..."] }
 ```
 
 The api removes the alert role, the roles of all filters and all role links of the guild. The filters themselves stay.
 
-### Status codes of `ToggleRoleManagement`
+Careful: the body always contains the whole settings, so `roleManagement: false` disables the role management whenever it is enabled, also if the bot only wanted to change another setting and read the settings before someone else enabled it. The bot should therefore always delete the roles of `roleDiscordIdsToDelete`, not only when it expects some.
+
+### Role management status codes of `POST api/Settings`
 
 | Status | Body | Meaning |
 |---|---|---|
-| `200` | `{ roleManagement, roleDiscordIdsToDelete }` | toggled |
+| `200` | `{ newSettings, roleDiscordIdsToDelete }` | saved |
 | `404` | | unknown guild |
-| `409` | | the setting already has this value (same as the other toggles) |
 | `400` | `alertRoleRequired` | enabling without `alertRoleDiscordId` |
 | `400` | `filterRoles` | enabling, but `filterRoles` does not contain exactly one role for every filter of the guild (e. g. a filter was added or deleted in the meantime) |
+| `409` | `roleManagement` | `roleManagement` is `true` and roles were sent, but the role management is enabled already (e. g. by a second admin in the meantime). The sent roles were not saved, the bot has to delete them |
+
+`roleManagement: true` without roles while it is enabled already is the normal case (nothing changes) and returns `200`.
 
 ### Locked while disabled
 
@@ -310,7 +355,7 @@ The bot should read `roleManagement` from `GET api/Settings` instead of guessing
 
 | Where (v1 file) | Change |
 |---|---|
-| `commands/settings` | new command for the setting. Check `Manage Roles` before enabling. Enabling = create roles, then call the api. Disabling = call the api, then delete the returned roles (ask for confirmation, members lose these roles) |
+| `commands/settings` | one `/settings` command without subcommands (the commands have to be deployed again): a container that shows every setting with a toggle button, plus save / cancel (like `/alerts config`). Saving sends all settings with one `POST api/Settings`. Role management: check `Manage Roles` before enabling. Enabling = create roles, then call the api (delete them again if it fails). Disabling = call the api, then delete the returned roles (warn before saving, members lose these roles) |
 | `commands/alerts/config.ts` | no longer creates the alert role (it exists if and only if the role management is enabled) and does not need `Manage Roles` anymore. Never send `alertRoleDiscordId` while disabled. The alert role section of the container should show the role, or a hint how to enable the role management |
 | `commands/filters/add` | only create the filter role (and check `Manage Roles`) if enabled, otherwise send the filter without `roleDiscordId`. The success message can not show a role mention then |
 | `commands/filters/list.ts` | `roleDiscordId` can be null, show the filter without role mention |
@@ -347,7 +392,8 @@ UI hints: the texts in `alerts/config.ts` that depend on `filterCount === 0` ("y
 - Repos take the already loaded `Guild` instead of loading it a second time by its id.
 - `AlertsHelper` no longer has a hardcoded default filter. `GetRolesToPing` returns an empty list for guilds with disabled role management (null still means "do not alert").
 - `AlertsRepo` no longer requires an alert role for alert guilds, only the channel.
-- `RolesRepo` enables / disables the role management (`EnableRoleManagementAsync`, `DisableRoleManagementAsync`), `GuildsRepo` creates the default filter (`CreateDefaultFilter`).
+- `RolesRepo` enables / disables the role management (`EnableRoleManagement`, `DisableRoleManagement`), `GuildsRepo` sets the other settings (`SetGuildsSettings`) and creates the default filter (`CreateDefaultFilter`). None of the three saves, the `SettingsController` saves all settings with one `SaveChangesAsync`.
+- DTOs of the settings: `GuildSettingsDto` (get), `GuildSettingsSetDto` (set, adds the roles), `GuildSettingsResDto` and `FilterRoleDto`. `ToggleSettingDto`, `ToggleRoleManagementDto` and `ToggleRoleManagementResDto` are removed.
 - `MatchBase` has the new computed properties `Tier`, `TierString` and `IsHltvCovered`.
 - The validation of request bodies moved from the controllers to attributes of the DTOs.
 - AutoMapper, SignalR, Playwright and HtmlAgilityPack are no longer used.
