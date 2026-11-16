@@ -258,7 +258,7 @@ The settings work like the alert config now: one endpoint to get all of them, on
 
 ## 6. Database
 
-New database, the tables of v1 are not migrated. Run `dotnet ef database update` (or `Update-Database`) to apply the new migrations `AddedAlertTables`, `MovedSettingsToGuildSettings`, `RenamedDiscordIds` (only renames columns and an index, no data is lost) and `AddedRoleManagement`.
+New database, the tables of v1 are not migrated by the api. The prod data of v1 is translated once with a separate sql file, see "Translation of the v1 prod data" below. Run `dotnet ef database update` (or `Update-Database`) to apply the new migrations `AddedAlertTables`, `MovedSettingsToGuildSettings`, `RenamedDiscordIds` (only renames columns and an index, no data is lost) and `AddedRoleManagement`.
 
 - Every table has a GuidV7 `Id` as primary key, plus `CreatedAt` and `UpdatedAt` (`BaseEntity`).
 - Discord ids are normal columns named `...DiscordId` (`Guilds.DiscordId`, `Guilds.AlertRoleDiscordId`, `Filters.RoleDiscordId`, `RoleLinks.BotRoleDiscordId`, ...). `Guilds.DiscordId` is unique.
@@ -270,6 +270,29 @@ New database, the tables of v1 are not migrated. Run `dotnet ef database update`
 - `MovedSettingsToGuildSettings` copies the settings of already existing guilds from the old `Guilds` columns into `GuildSettings` before it drops the columns (and back, when it is reverted).
 - Removed tables: `FiltersNews`, `HistoryNewsAlerts` and all `HLTV_*` tables. Matches, results, events and teams are no longer stored, they come from the (cached) `LiquipediaService`.
 - `HistoryMatchAlerts` / `HistoryResultAlerts` use the Liquipedia `MatchId` (unique) instead of the HLTV url.
+
+### Translation of the v1 prod data
+
+The guilds, filters and role links of the v1 prod database are translated into the new structure (`BOT-Greg-v2_new.sql`, data only, imported into the empty database after the migrations were applied).
+
+- **Guilds:** `GuildId` -> `DiscordId`, new internal `Id`. `GuildOwner`, `NewsAlertsChannelId`, `MentionOnNews` and `AlwaysShowNewsImage` are dropped. The settings move to `GuildSettings` with their old values, `CreatedAt` is kept.
+- **Guilds with filters:** `RoleManagement = true`, they keep their alert role, filter roles and role links.
+- **Guilds without filters:** `RoleManagement = false`, they get the default filter (section 8) without role. Their old alert role and their role links are discarded (the roles still exist in Discord, the bot just no longer knows them). Guilds that only had news filters count as guilds without filters.
+- **News filters:** dropped.
+- **Stars:** replaced by the VRS rank filter (both teams within the top x):
+
+| Stars (v1) | `VrsRank` (v2) |
+|---|---|
+| 5 | 5 |
+| 4 | 10 |
+| 3 | 15 |
+| 2 | 20 |
+| 1 | 25 |
+
+  If the filter already had a VRS rank, the lower (stricter) one of the two is used, as both had to fit in v1.
+- **Event tier:** string -> number (section 3). `D-Tier` becomes `C-Tier` (`4`), the lowest tier of v2.
+- **Teams:** HLTV names are replaced by the Liquipedia names (`Vitality` -> `Team Vitality`, `FaZe` -> `FaZe Clan`, `Navi` -> `Natus Vincere`, ...). Names that are unknown to Liquipedia are kept unchanged, those filters do not match until they are recreated.
+- **Events:** kept unchanged (HLTV names), nearly all of them are over already.
 
 ---
 

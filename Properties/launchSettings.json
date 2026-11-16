@@ -7,13 +7,14 @@
       },
       "dotnetRunMessages": true,
       "applicationUrl": "http://localhost:5294",
-      "launchBrowser": true, // swagger
-      "launchUrl": "" // swagger
+      "launchBrowser": true,
+      "launchUrl": ""
     },
     "Container (Dockerfile)": {
       "commandName": "Docker",
       "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
       "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
         "ASPNETCORE_HTTP_PORTS": "8080"
       },
       "publishAllPorts": true,

@@ -58,6 +58,16 @@ public class Program
         builder.Services.AddHostedService<AlertStreamHeartbeat>();
 
         var app = builder.Build();
+        
+        if (app.Environment.IsProduction())
+        {
+            // Apply pending migrations automatically in prod
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<BotGregDbContext>();
+                db.Database.Migrate();
+            }
+        }
 
         if (app.Environment.IsDevelopment())
         {
