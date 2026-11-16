@@ -89,6 +89,6 @@ public class MatchDelaysService
             delayedMatches.Add(match);
         }
 
-        return delayedMatches;
+        return delayedMatches.OrderBy(x => x.DateTime).ToList();
     }
 }

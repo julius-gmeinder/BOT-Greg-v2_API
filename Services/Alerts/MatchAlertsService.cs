@@ -73,6 +73,7 @@ public class MatchAlertsService
         var startingMatches = matches
             .Where(x => x.DateTime <= alertWindowEnd)
             .Where(x => x.TeamX != null && x.TeamY != null)
+            .OrderBy(x => x.DateTime)
             .ToList();
 
         if (startingMatches.Count == 0)
