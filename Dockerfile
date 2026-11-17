@@ -6,6 +6,9 @@ USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
 
+# docker logs are not a terminal, so the colors of the logs have to be forced (see Utils/Logging.cs)
+ENV Logging__Console__FormatterOptions__ColorBehavior=Enabled
+
 
 # This stage is used to build the service project
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build

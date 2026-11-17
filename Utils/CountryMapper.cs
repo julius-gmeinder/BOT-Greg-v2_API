@@ -1,6 +1,6 @@
 ﻿using System.Collections.Frozen;
 
-namespace BOT_Greg_v2_API.Helpers;
+namespace BOT_Greg_v2_API.Utils;
 
 public static class CountryMapper
 {

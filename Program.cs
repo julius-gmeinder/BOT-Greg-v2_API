@@ -2,6 +2,7 @@ using BOT_Greg_v2_API.Data;
 using BOT_Greg_v2_API.Repos;
 using BOT_Greg_v2_API.Services;
 using BOT_Greg_v2_API.Services.Alerts;
+using BOT_Greg_v2_API.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace BOT_Greg_v2_API;
@@ -15,6 +16,14 @@ public class Program
         builder.Services.AddControllers();
         builder.Services.AddSwaggerGen();
         builder.Services.AddMemoryCache();
+
+        // Logging
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole(options =>
+        {
+            options.FormatterName = LoggingFormatter.FormatterName;
+        });
+        builder.Logging.AddConsoleFormatter<LoggingFormatter, LoggingFormatterOptions>();
 
         string connString = builder.Configuration.GetConnectionString("BotGregDb")!;
         builder.Services.AddDbContextPool<BotGregDbContext>(options =>
