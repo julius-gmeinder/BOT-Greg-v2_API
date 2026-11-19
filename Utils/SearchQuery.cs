@@ -2,10 +2,9 @@ using System.Text.RegularExpressions;
 
 namespace BOT_Greg_v2_API.Utils;
 
-// the search of the schedule endpoints: case insensitive "contains", plus the shorthands of Constants.SearchAliases
 public class SearchQuery
 {
-    // a variant per shorthand combination is enough, this just stops long searches with many shorthands from exploding
+    // stops long searches with many shorthands from exploding
     private const int MaxVariants = 16;
 
     private readonly string _search;
@@ -21,13 +20,12 @@ public class SearchQuery
             .ToList();
     }
 
-    // null if there is nothing to search for (null / empty / whitespace)
+    // null if the search is empty
     public static SearchQuery? Create(string? search)
     {
         return string.IsNullOrWhiteSpace(search) ? null : new SearchQuery(search.Trim());
     }
 
-    // true if any of the values fits the search
     public bool Fits(params string?[] values)
     {
         return values.Any(Fits);
@@ -41,8 +39,7 @@ public class SearchQuery
         if (value.Contains(_search, StringComparison.OrdinalIgnoreCase))
             return true;
 
-        // ignores spaces, dashes etc., so "a tier" and "atier" find "A-Tier"
-        // (a search of only symbols, e. g. "-", would match everything after normalizing)
+        // ignores spaces, dashes etc. ("a tier" finds "A-Tier"), a search of only symbols would match everything
         if (_normalizedSearch.Length > 0 && Normalize(value).Contains(_normalizedSearch, StringComparison.OrdinalIgnoreCase))
             return true;
 
@@ -68,7 +65,7 @@ public class SearchQuery
 
                     foreach (var otherName in group.Where(other => other != name))
                     {
-                        // the replacement is literal, "$" in a name must not be read as a group reference
+                        // literal replacement, so "$" in a name is not read as a group reference
                         string replaced = namePattern.Replace(variant, _ => otherName);
 
                         if (variants.Count < MaxVariants && !variants.Contains(replaced, StringComparer.OrdinalIgnoreCase))

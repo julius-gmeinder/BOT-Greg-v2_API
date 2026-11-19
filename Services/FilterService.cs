@@ -4,7 +4,6 @@ using BOT_Greg_v2_API.Models.External;
 
 namespace BOT_Greg_v2_API.Services;
 
-// decides which matches / events fit the filters of a guild (used by the alerts and the schedule endpoints)
 public class FilterService
 {
     private readonly LiquipediaService _liquipedia;
@@ -45,7 +44,7 @@ public class FilterService
         return matchingFilters.Count > 0 ? matchingFilters : null;
     }
 
-    // events only know their name and tier, all other filter properties are ignored
+    // events only have a name and a tier, the other filter properties are ignored
     public bool EventPassesFilters(Guild guild, Event ev)
     {
         if (guild.Filters.Count == 0)
@@ -81,7 +80,7 @@ public class FilterService
         if (filter.Event != null && !string.Equals(filter.Event, ev.EventName, StringComparison.OrdinalIgnoreCase))
             return false;
 
-        // the tier of an event is not nullable, so a tier that is not part of the enum (e. g. misc events) has to be checked
+        // tiers outside the enum (misc events) fail a tier filter
         if (filter.EventTier != null && (!Enum.IsDefined(ev.Tier) || ev.Tier > filter.EventTier))
             return false;
 

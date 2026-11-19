@@ -23,7 +23,7 @@ public class LiquipediaService
     private static readonly TimeSpan TeamsCacheTime = TimeSpan.FromHours(24);
 
     private const int EventsPageSize = 500;
-    private const int EventsMaxPages = 10; // safety cap, so a misbehaving api can not loop forever
+    private const int EventsMaxPages = 10; // safety cap for the paging
 
     public LiquipediaService(HttpClient httpClient, IConfiguration config, ILogger<LiquipediaService> logger, VrsService vrs, IMemoryCache cache)
     {
@@ -132,8 +132,8 @@ public class LiquipediaService
         string now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         string past = DateTime.UtcNow.AddHours(-Constants.LiveMatchesLookbackHours).ToString("yyyy-MM-dd HH:mm:ss");
 
-        // a live match already started but is not finished yet, the lookback skips old matches that never got marked as finished
-        // dateexact: matches with only a known day (placeholder time) would otherwise show up as live
+        // the lookback skips stale matches that never got marked as finished
+        // without dateexact, matches with a placeholder time would show up as live
         string conditions = $"[[game::cs2]] AND [[finished::0]] AND [[dateexact::1]] AND [[date::<{now}]] AND [[date::>{past}]]";
         string limit = "100";
 
@@ -338,7 +338,6 @@ public class LiquipediaService
 
                 string channel = streamElement.Value.GetString()!;
 
-                // .add() returns true if the item was added, false if it was already present
                 if (seenStreams.Add((platform, channel)))
                 {
                     streams.Add(new Stream
@@ -509,7 +508,7 @@ public class LiquipediaService
             {
                 count++;
 
-                // fallback for other spellings ("canceled") the condition does not catch
+                // fallback for spellings the condition does not catch ("canceled")
                 if (IsCanceled(element))
                     continue;
 
@@ -534,7 +533,7 @@ public class LiquipediaService
     {
         string lpTier = element.GetProperty("liquipediatier").GetString()!;
         string valveTier = element.GetProperty("publishertier").GetString()!;
-        // with the longer horizon more misc events show up, a non numeric tier must not break the whole fetch (-1 is not part of the enum)
+        // a non numeric tier must not break the whole fetch (-1 is not part of the enum)
         int tier = valveTier == "Major Championship" ? 0 : (int.TryParse(lpTier, out int parsedTier) ? parsedTier : -1);
 
         var locationNode = element.GetProperty("locations");

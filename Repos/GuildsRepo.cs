@@ -70,7 +70,7 @@ public class GuildsRepo
 
         foreach (var guildDto in allGuilds.DistinctBy(x => x.GuildDiscordId))
         {
-            // .Remove() returns true if the guild was in the dictionary, so only the guilds to delete are left over at the end
+            // removing the existing guilds from the dictionary leaves only the guilds to delete at the end
             if (guildsInDb.Remove(guildDto.GuildDiscordId, out var existingGuild))
             {
                 existingGuild.GuildName = guildDto.GuildName;

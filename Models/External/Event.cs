@@ -27,7 +27,7 @@ public class Event
     public string? City { get; init; }
     public string LocationString => BuildLocationString();
 
-    // started (today or earlier) and not over yet, an event without an end date counts as ongoing
+    // an event without an end date counts as ongoing
     public bool IsOngoing => StartDate != null
         && StartDate.Value.Date <= DateTime.UtcNow.Date
         && (EndDate == null || EndDate.Value.Date >= DateTime.UtcNow.Date);

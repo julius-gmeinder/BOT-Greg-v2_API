@@ -81,7 +81,6 @@ public class ScheduleController : ControllerBase
             .Where(ev => query == null || query.Fits(ev.EventName, ev.TierString, ev.LocationString))
             .Where(ev => guild == null || _filters.EventPassesFilters(guild, ev));
 
-        // ongoing events first, events without a start date last
         return Ok(events
             .OrderByDescending(ev => ev.IsOngoing)
             .ThenBy(ev => ev.StartDate == null)
@@ -89,7 +88,7 @@ public class ScheduleController : ControllerBase
             .ToList());
     }
 
-    // the guild is only needed if its filters are applied, null means "no filtering" (or "not found" if filters are requested)
+    // null = no filtering (or not found, if filters are requested)
     private async Task<Guild?> GetFilterGuildAsync(string guildDiscordId, bool useFilters)
     {
         if (!useFilters)
