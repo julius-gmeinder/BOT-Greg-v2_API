@@ -57,6 +57,7 @@ public class Program
 
         // Alerts
         builder.Services.AddSingleton<AlertStreamService>();
+        builder.Services.AddScoped<FilterService>();
         builder.Services.AddScoped<AlertsHelper>();
         builder.Services.AddScoped<MatchAlertsService>();
         builder.Services.AddScoped<MatchDelaysService>();

@@ -12,6 +12,7 @@ Everything the bot frontend has to adapt to. Internal changes that the bot does 
 6. All Discord ids got renamed to `...DiscordId` in request bodies, query parameters and responses (`guildId` -> `guildDiscordId`, `roleId` -> `roleDiscordId`, ...), see section 4.
 7. **Role management is opt-in** (new setting `roleManagement`, default `false`). Without it the bot must not create any role: no alert role, no filter roles, no role links, alerts without mentions. See section 7.
 8. **Settings are read and set as a whole** (`GET` / `POST api/Settings`, like the alert config). All `api/Settings/Toggle...` endpoints are gone. See section 4 (Settings) and section 7.
+9. New user endpoints `GET api/Schedule/matches` (`status=upcoming` or `live`), `results` and `events` with `search` and optional guild filters, and `isOngoing` on events. See section 9.
 
 ---
 
@@ -405,12 +406,58 @@ UI hints: the texts in `alerts/config.ts` that depend on `filterCount === 0` ("y
 
 ---
 
-## 9. Internal changes (not relevant for the bot)
+## 9. Schedule endpoints
+
+Three new endpoints for the user commands `/matches`, `/results` and `/events` (`ScheduleController`, route `api/Schedule`). All of them return `200` with a JSON array.
+
+| Query parameter | | |
+|---|---|---|
+| `guildDiscordId` | required | the guild whose filters are applied |
+| `useFilters` | optional, default `true` | `false` = every match / event, the guild is not even loaded (it does not have to exist) |
+| `search` | optional | trimmed, null / empty / whitespace = no search. Case insensitive `contains`, also ignoring spaces, dashes and other symbols ("a tier" finds "A-Tier"). Shorthands of `Constants.SearchAliases` work both ways ("iem" finds "Intel Extreme Masters", "natus vincere" finds "NaVi") |
+| `status` | only `matches`, default `upcoming` | `upcoming` or `live` (case insensitive) |
+
+| Status | When |
+|---|---|
+| `404` | `useFilters=true` and the guild does not exist |
+| `400` | `matches` with an invalid `status` (body `status`) |
+
+Filters work like in the alerts: any filter that passes is enough, a guild without filters gets everything (`useFilters=false` does the same).
+
+### `GET api/Schedule/matches`
+
+- `status=upcoming`: `MatchUpcoming[]` (same objects as in the alerts), the matches of the next 25 hours, sorted by `dateTime` ascending.
+- `status=live`: `MatchLive[]`, matches that already started and are not finished (started within the last 12 hours), sorted by `dateTime` ascending. Cached for 5 minutes, so it is not real time.
+- Search fields: `teamX.name`, `teamX.nameShort`, `teamY.name`, `teamY.nameShort`, `eventName`, `tierString`, `stage`.
+
+`MatchLive` is a `MatchUpcoming` (with `streams`) plus:
+
+| Property | |
+|---|---|
+| `teamXMapScore` / `teamYMapScore` | maps won so far (number). A map that is in progress does not count |
+| `maps` | `[{ name, teamXScore, teamYScore, mapPlayed }]`, same as in the result. The map in progress has its current round score and `mapPlayed: true` (as soon as a round was played) |
+
+### `GET api/Schedule/results`
+
+- `MatchResult[]` (same objects as in the alerts), the finished matches of the last 24 hours, sorted by `dateTime` descending (newest first).
+- Search fields like the matches.
+
+### `GET api/Schedule/events`
+
+- `Event[]` (same objects as `api/Liquipedia/events`), sorted: ongoing events first, then by `startDate` ascending (no start date last).
+- Search fields: `eventName`, `tierString`, `locationString`.
+- Events only know their name and tier, so only `event` and `eventTier` of a filter count. `team`, `vrsRank` and `hltvCoverage` are ignored. An event passes a filter if (`event` is null or equals `eventName`, case insensitive) and (`eventTier` is null or the tier of the event is a valid tier that is `<=` the filter tier). Events with a tier outside of the tier list never pass a filter with a tier.
+- New property `isOngoing` (bool): `startDate` is today or earlier and `endDate` is today or later (or null).
+- The event list (also used by `api/Liquipedia/events` and `api/Autocomplete/events`) now contains the events of the next 6 months (was: the first 100 events, no upper bound).
+
+## 10. Internal changes (not relevant for the bot)
 
 - `LiquipediaService`: cache time of matches and results is 5 minutes (was 3). All `Get...Async` methods have an optional `refetch` parameter, that skips the cache and replaces the cached data.
 - `BackgroundWorker`: runs every 5 minutes (synced to the clock), refetches matches and results once and passes them to `MatchDelaysService`, `MatchAlertsService` and `ResultAlertsService`. An exception in a run is logged and does not stop the worker.
 - The 24 hour worker is gone, teams and events are cached for 24 hours by the `LiquipediaService`.
 - `AlertsHelper` has one filter comparison for matches and results (v1 had a copy for upcoming matches, live matches and results). Guilds, settings, filters and role links are loaded with one query per run instead of one query per guild / role.
+- `FilterService` (scoped) holds the filter comparison (moved out of `AlertsHelper`, which delegates to it) and `GetTeamsByNameAsync`. It also answers whether a match or an event passes the filters of a guild (used by the `ScheduleController`).
+- `LiquipediaService`: new `GetLiveMatchesAsync` (cache key `lp_live`, 5 minutes). Parsing of streams, teams, links and maps is shared by all match fetches. Events are fetched page by page (500 per page, max 10 pages) up to `Constants.EventsHorizonMonths` (6) months ahead.
 - `AlertStreamService` (singleton) holds the connected stream clients, `AlertStreamHeartbeat` sends the heartbeat.
 - Repos take the already loaded `Guild` instead of loading it a second time by its id.
 - `AlertsHelper` no longer has a hardcoded default filter. `GetRolesToPing` returns an empty list for guilds with disabled role management (null still means "do not alert").

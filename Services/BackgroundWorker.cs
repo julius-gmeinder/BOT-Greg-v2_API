@@ -41,7 +41,7 @@ public class BackgroundWorker : BackgroundService
             using var scope = _services.CreateScope();
 
             var liquipedia = scope.ServiceProvider.GetRequiredService<LiquipediaService>();
-            var alertsHelper = scope.ServiceProvider.GetRequiredService<AlertsHelper>();
+            var filterService = scope.ServiceProvider.GetRequiredService<FilterService>();
 
             var matchDelaysService = scope.ServiceProvider.GetRequiredService<MatchDelaysService>();
             var matchAlertsService = scope.ServiceProvider.GetRequiredService<MatchAlertsService>();
@@ -50,7 +50,7 @@ public class BackgroundWorker : BackgroundService
             // alerts need the newest data, so matches and results skip the cache
             var matches = await liquipedia.GetMatchesAsync(refetch: true);
             var results = await liquipedia.GetResultsAsync(refetch: true);
-            var teamsByName = await alertsHelper.GetTeamsByNameAsync();
+            var teamsByName = await filterService.GetTeamsByNameAsync();
 
             if (_stream.ClientCount == 0)
                 _logger.LogWarning("No client is connected to the alert stream, alerts of this run will not be received");

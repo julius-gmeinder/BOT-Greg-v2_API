@@ -17,9 +17,13 @@ public class LiquipediaService
     private readonly string _apiKey;
 
     private static readonly TimeSpan MatchesCacheTime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan LiveMatchesCacheTime = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan ResultsCacheTime = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan EventsCacheTime = TimeSpan.FromHours(24);
     private static readonly TimeSpan TeamsCacheTime = TimeSpan.FromHours(24);
+
+    private const int EventsPageSize = 500;
+    private const int EventsMaxPages = 10; // safety cap, so a misbehaving api can not loop forever
 
     public LiquipediaService(HttpClient httpClient, IConfiguration config, ILogger<LiquipediaService> logger, VrsService vrs, IMemoryCache cache)
     {
@@ -35,6 +39,8 @@ public class LiquipediaService
 
     // refetch = true skips the cache and fetches the newest data (which then replaces the cached data)
     public Task<List<MatchUpcoming>> GetMatchesAsync(bool refetch = false) => GetCachedAsync("lp_matches", MatchesCacheTime, FetchMatchesAsync, refetch);
+
+    public Task<List<MatchLive>> GetLiveMatchesAsync(bool refetch = false) => GetCachedAsync("lp_live", LiveMatchesCacheTime, FetchLiveMatchesAsync, refetch);
 
     public Task<List<MatchResult>> GetResultsAsync(bool refetch = false) => GetCachedAsync("lp_results", ResultsCacheTime, FetchResultsAsync, refetch);
 
@@ -85,75 +91,8 @@ public class LiquipediaService
 
         foreach (var element in resultNode.EnumerateArray())
         {
-            List<Stream> streams = new();
-            var streamNode = element.GetProperty("stream");
-
-            HashSet<(StreamPlatform, string)> seenStreams = new();
-
-            // if an object is empty, php serializes it as an empty array [] instead of an empty object {}
-            if (streamNode.ValueKind != JsonValueKind.Array)
-            {
-                foreach (var streamElement in streamNode.EnumerateObject())
-                {
-                    string platformString = streamElement.Name.Split('_')[0];
-
-                    if (!Enum.TryParse<StreamPlatform>(platformString, ignoreCase: true, out var platform))
-                        continue;
-
-                    string channel = streamElement.Value.GetString()!;
-
-                    // .add() returns true if the item was added, false if it was already present
-                    if (seenStreams.Add((platform, channel)))
-                    {
-                        streams.Add(new Stream
-                        {
-                            Platform = platform,
-                            Channel = channel
-                        });
-                    }
-
-                }
-            }
-
-            MatchTeam?[] teams = { null, null };
             var teamsNode = element.GetProperty("match2opponents");
-
-            for (int i = 0; i <= 1; i++)
-            {
-                var teamNode = teamsNode[i];
-
-                if (teamNode.GetProperty("type").GetString() == "team")
-                {
-                    teams[i] = new MatchTeam()
-                    {
-                        Name = teamNode.GetProperty("teamtemplate").GetProperty("name").GetString()!,
-                        NameShort = teamNode.GetProperty("teamtemplate").GetProperty("shortname").GetString()!,
-                        Players = teamNode.GetProperty("match2players").EnumerateArray().Select(p => new MatchPlayer
-                        {
-                            Name = p.GetProperty("name").GetString()!,
-                            Country = p.GetProperty("flag").GetString()!,
-                        }).ToList()
-                    };
-                }
-            }
-
-            string? hltvUrl = null;
-            string? faceitUrl = null;
-            var linksNode = element.GetProperty("links");
-
-            if (linksNode.ValueKind != JsonValueKind.Array)
-            {
-                if (linksNode.TryGetProperty("hltv", out var hltvProperty))
-                {
-                    hltvUrl = hltvProperty.GetProperty("1").GetProperty("1").GetString();
-                }
-
-                if (linksNode.TryGetProperty("faceit", out var faceitProperty))
-                {
-                    faceitUrl = faceitProperty.GetProperty("1").GetProperty("1").GetString();
-                }
-            }
-
+            var (hltvUrl, faceitUrl) = ParseLinks(element);
 
             MatchUpcoming match = new()
             {
@@ -174,10 +113,79 @@ public class LiquipediaService
                 HltvUrl = hltvUrl,
                 FaceitUrl = faceitUrl,
 
-                Streams = streams,
+                Streams = ParseStreams(element),
 
-                TeamX = teams[0],
-                TeamY = teams[1],
+                TeamX = ParseTeam(teamsNode[0]),
+                TeamY = ParseTeam(teamsNode[1]),
+            };
+
+            matches.Add(match);
+        }
+
+        return matches;
+    }
+
+    private async Task<List<MatchLive>> FetchLiveMatchesAsync()
+    {
+        List<MatchLive> matches = new();
+
+        string now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        string past = DateTime.UtcNow.AddHours(-Constants.LiveMatchesLookbackHours).ToString("yyyy-MM-dd HH:mm:ss");
+
+        // a live match already started but is not finished yet, the lookback skips old matches that never got marked as finished
+        // dateexact: matches with only a known day (placeholder time) would otherwise show up as live
+        string conditions = $"[[game::cs2]] AND [[finished::0]] AND [[dateexact::1]] AND [[date::<{now}]] AND [[date::>{past}]]";
+        string limit = "100";
+
+        string url = $"{Constants.LpApiBaseUrl}/match?wiki=counterstrike&limit={limit}&conditions={Uri.EscapeDataString(conditions)}&order=date%20ASC";
+
+        var response = await _httpClient.GetAsync(url);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError($"Fetching live matches failed: {response.StatusCode} - {response.ReasonPhrase}");
+            return matches;
+        }
+
+        var data = await response.Content.ReadAsStringAsync();
+        using JsonDocument json = JsonDocument.Parse(data);
+        //JsonTools.LogJson(json);
+
+        var resultNode = json.RootElement.GetProperty("result");
+
+        foreach (var element in resultNode.EnumerateArray())
+        {
+            var teamsNode = element.GetProperty("match2opponents");
+            var (hltvUrl, faceitUrl) = ParseLinks(element);
+            var (teamXMapScore, teamYMapScore) = ParseLiveMapScore(element, teamsNode);
+
+            MatchLive match = new()
+            {
+                MatchId = element.GetProperty("match2id").GetString()!,
+
+                EventId = element.GetProperty("pageid").GetInt32()!,
+                EventName = element.GetProperty("tournament").GetString()!,
+                EventRelUrl = element.GetProperty("parent").GetString()!,
+
+                DateTime = DateTime.Parse(element.GetProperty("date").GetString()!),
+                BestOf = element.GetProperty("bestof").GetInt32(),
+                Environment = element.GetProperty("type").GetString()!,
+                Stage = element.GetProperty("section").GetString()!,
+
+                LpTier = element.GetProperty("liquipediatier").GetString()!,
+                ValveTier = element.GetProperty("publishertier").GetString()!,
+
+                HltvUrl = hltvUrl,
+                FaceitUrl = faceitUrl,
+
+                Streams = ParseStreams(element),
+
+                TeamX = ParseTeam(teamsNode[0]),
+                TeamY = ParseTeam(teamsNode[1]),
+
+                TeamXMapScore = teamXMapScore,
+                TeamYMapScore = teamYMapScore,
+                Maps = ParseMaps(element)
             };
 
             matches.Add(match);
@@ -262,70 +270,11 @@ public class LiquipediaService
                         matchWinner = (i + 1).ToString();
                 }
 
-                if (teamNode.GetProperty("type").GetString() == "team")
-                {
-                    teams[i] = new MatchTeam()
-                    {
-                        Name = teamNode.GetProperty("teamtemplate").GetProperty("name").GetString()!,
-                        NameShort = teamNode.GetProperty("teamtemplate").GetProperty("shortname").GetString()!,
-                        Players = teamNode.GetProperty("match2players").EnumerateArray().Select(p => new MatchPlayer
-                        {
-                            Name = p.GetProperty("name").GetString()!,
-                            Country = p.GetProperty("flag").GetString()!,
-                        }).ToList()
-                    };
-                }
+                teams[i] = ParseTeam(teamNode);
             }
 
-            string? hltvUrl = null;
-            string? faceitUrl = null;
-            var linksNode = element.GetProperty("links");
-
-            if (linksNode.ValueKind != JsonValueKind.Array)
-            {
-                if (linksNode.TryGetProperty("hltv", out var hltvProperty))
-                    hltvUrl = hltvProperty.GetProperty("1").GetProperty("1").GetString();
-
-                if (linksNode.TryGetProperty("faceit", out var faceitProperty))
-                    faceitUrl = faceitProperty.GetProperty("1").GetProperty("1").GetString();
-            }
-
-            List<Map> maps = new();
-            if (element.TryGetProperty("match2games", out var gamesNode) && gamesNode.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var gameNode in gamesNode.EnumerateArray())
-                {
-                    int[] mapScores = { 0, 0 };
-
-                    if (gameNode.TryGetProperty("scores", out var scoresNode) && scoresNode.ValueKind == JsonValueKind.Array)
-                    {
-                        int index = 0;
-                        foreach (var score in scoresNode.EnumerateArray())
-                        {
-                            if (index <= 1)
-                            {
-                                if (score.ValueKind == JsonValueKind.Number)
-                                    mapScores[index] = score.GetInt32();
-                                else if (score.ValueKind == JsonValueKind.String)
-                                    int.TryParse(score.GetString(), out mapScores[index]);
-                            }
-
-                            index++;
-                        }
-                    }
-
-                    bool mapPlayed = (gameNode.TryGetProperty("winner", out var winnerProp) && !string.IsNullOrWhiteSpace(winnerProp.GetString()))
-                                    || mapScores[0] > 0
-                                    || mapScores[1] > 0;
-
-                    maps.Add(new Map
-                    {
-                        Name = gameNode.TryGetProperty("map", out var mapProp) ? mapProp.GetString()! : "Unknown",
-                        TeamXScore = mapPlayed ? mapScores[0] : null,
-                        TeamYScore = mapPlayed ? mapScores[1] : null
-                    });
-                }
-            }
+            var (hltvUrl, faceitUrl) = ParseLinks(element);
+            List<Map> maps = ParseMaps(element);
 
             int teamXMapScore = maps.Count(m => m.TeamXScore > m.TeamYScore);
             int teamYMapScore = maps.Count(m => m.TeamYScore > m.TeamXScore);
@@ -370,80 +319,261 @@ public class LiquipediaService
         return results;
     }
 
+    private static List<Stream> ParseStreams(JsonElement element)
+    {
+        List<Stream> streams = new();
+        var streamNode = element.GetProperty("stream");
+
+        HashSet<(StreamPlatform, string)> seenStreams = new();
+
+        // if an object is empty, php serializes it as an empty array [] instead of an empty object {}
+        if (streamNode.ValueKind != JsonValueKind.Array)
+        {
+            foreach (var streamElement in streamNode.EnumerateObject())
+            {
+                string platformString = streamElement.Name.Split('_')[0];
+
+                if (!Enum.TryParse<StreamPlatform>(platformString, ignoreCase: true, out var platform))
+                    continue;
+
+                string channel = streamElement.Value.GetString()!;
+
+                // .add() returns true if the item was added, false if it was already present
+                if (seenStreams.Add((platform, channel)))
+                {
+                    streams.Add(new Stream
+                    {
+                        Platform = platform,
+                        Channel = channel
+                    });
+                }
+
+            }
+        }
+
+        return streams;
+    }
+
+    // returns null if the opponent is not a team (e. g. tbd)
+    private static MatchTeam? ParseTeam(JsonElement teamNode)
+    {
+        if (teamNode.GetProperty("type").GetString() != "team")
+            return null;
+
+        return new MatchTeam()
+        {
+            Name = teamNode.GetProperty("teamtemplate").GetProperty("name").GetString()!,
+            NameShort = teamNode.GetProperty("teamtemplate").GetProperty("shortname").GetString()!,
+            Players = teamNode.GetProperty("match2players").EnumerateArray().Select(p => new MatchPlayer
+            {
+                Name = p.GetProperty("name").GetString()!,
+                Country = p.GetProperty("flag").GetString()!,
+            }).ToList()
+        };
+    }
+
+    private static (string? HltvUrl, string? FaceitUrl) ParseLinks(JsonElement element)
+    {
+        string? hltvUrl = null;
+        string? faceitUrl = null;
+        var linksNode = element.GetProperty("links");
+
+        if (linksNode.ValueKind != JsonValueKind.Array)
+        {
+            if (linksNode.TryGetProperty("hltv", out var hltvProperty))
+                hltvUrl = hltvProperty.GetProperty("1").GetProperty("1").GetString();
+
+            if (linksNode.TryGetProperty("faceit", out var faceitProperty))
+                faceitUrl = faceitProperty.GetProperty("1").GetProperty("1").GetString();
+        }
+
+        return (hltvUrl, faceitUrl);
+    }
+
+    private static List<Map> ParseMaps(JsonElement element)
+    {
+        List<Map> maps = new();
+
+        if (element.TryGetProperty("match2games", out var gamesNode) && gamesNode.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var gameNode in gamesNode.EnumerateArray())
+            {
+                int[] mapScores = { 0, 0 };
+
+                if (gameNode.TryGetProperty("scores", out var scoresNode) && scoresNode.ValueKind == JsonValueKind.Array)
+                {
+                    int index = 0;
+                    foreach (var score in scoresNode.EnumerateArray())
+                    {
+                        if (index <= 1)
+                        {
+                            if (score.ValueKind == JsonValueKind.Number)
+                                mapScores[index] = score.GetInt32();
+                            else if (score.ValueKind == JsonValueKind.String)
+                                int.TryParse(score.GetString(), out mapScores[index]);
+                        }
+
+                        index++;
+                    }
+                }
+
+                bool mapPlayed = (gameNode.TryGetProperty("winner", out var winnerProp) && !string.IsNullOrWhiteSpace(winnerProp.GetString()))
+                                || mapScores[0] > 0
+                                || mapScores[1] > 0;
+
+                maps.Add(new Map
+                {
+                    Name = gameNode.TryGetProperty("map", out var mapProp) ? mapProp.GetString()! : "Unknown",
+                    TeamXScore = mapPlayed ? mapScores[0] : null,
+                    TeamYScore = mapPlayed ? mapScores[1] : null
+                });
+            }
+        }
+
+        return maps;
+    }
+
+    // maps won so far: the score of the opponents is preferred, the finished games are the fallback
+    private static (int TeamX, int TeamY) ParseLiveMapScore(JsonElement element, JsonElement teamsNode)
+    {
+        int?[] scores = { null, null };
+
+        for (int i = 0; i <= 1; i++)
+        {
+            if (teamsNode[i].TryGetProperty("score", out var scoreNode) && scoreNode.ValueKind == JsonValueKind.Number
+                && scoreNode.TryGetInt32(out int score) && score >= 0)
+            {
+                scores[i] = score;
+            }
+        }
+
+        if (scores[0] != null && scores[1] != null)
+            return (scores[0]!.Value, scores[1]!.Value);
+
+        int teamXWins = 0;
+        int teamYWins = 0;
+
+        if (element.TryGetProperty("match2games", out var gamesNode) && gamesNode.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var gameNode in gamesNode.EnumerateArray())
+            {
+                // a map in progress has scores but no winner yet, so only the winner counts
+                if (!gameNode.TryGetProperty("winner", out var winnerProp))
+                    continue;
+
+                string? winner = winnerProp.ValueKind == JsonValueKind.Number ? winnerProp.GetRawText() : winnerProp.GetString();
+
+                if (winner == "1")
+                    teamXWins++;
+                else if (winner == "2")
+                    teamYWins++;
+            }
+        }
+
+        return (teamXWins, teamYWins);
+    }
+
     private async Task<List<Event>> FetchEventsAsync()
     {
         List<Event> events = new();
 
         string now = DateTime.UtcNow.ToString("yyyy-MM-dd");
         string past = DateTime.UtcNow.AddDays(-14).ToString("yyyy-MM-dd"); // restricting startdate, to filter "event-groups"
+        string horizon = DateTime.UtcNow.AddMonths(Constants.EventsHorizonMonths).ToString("yyyy-MM-dd");
 
-        string conditions = $"[[game::cs2]] AND [[enddate::>{now}]] AND [[startdate::>{past}]]";
-        string limit = "100";
+        // canceled events keep their dates on liquipedia, only their status tells them apart
+        string conditions = $"[[game::cs2]] AND [[enddate::>{now}]] AND [[startdate::>{past}]] AND [[startdate::<{horizon}]] AND [[status::!cancelled]]";
 
-        string url = $"{Constants.LpApiBaseUrl}/tournament?wiki=counterstrike&limit={limit}&conditions={Uri.EscapeDataString(conditions)}&order=startdate%20ASC";
-
-        var response = await _httpClient.GetAsync(url);
-
-        if (!response.IsSuccessStatusCode)
+        for (int page = 0; page < EventsMaxPages; page++)
         {
-            _logger.LogError($"Fetching evemts failed: {response.StatusCode} - {response.ReasonPhrase}");
-            return events;
-        }
+            // the name is the tiebreaker, so the pages stay stable if events share a start date
+            string url = $"{Constants.LpApiBaseUrl}/tournament?wiki=counterstrike&limit={EventsPageSize}&offset={page * EventsPageSize}&conditions={Uri.EscapeDataString(conditions)}&order=startdate%20ASC,pagename%20ASC";
 
-        var data = await response.Content.ReadAsStringAsync();
-        using JsonDocument json = JsonDocument.Parse(data);
-        //JsonTools.LogJson(json);
+            var response = await _httpClient.GetAsync(url);
 
-        var resultNode = json.RootElement.GetProperty("result");
-
-        foreach (var element in resultNode.EnumerateArray())
-        {
-            string lpTier = element.GetProperty("liquipediatier").GetString()!;
-            string valveTier = element.GetProperty("publishertier").GetString()!;
-            int tier = valveTier == "Major Championship" ? 0 : Convert.ToInt32(lpTier);
-
-            var locationNode = element.GetProperty("locations");
-            string? region = null;
-            string? country = null;
-            string? city = null;
-
-            if (locationNode.ValueKind != JsonValueKind.Array)
+            if (!response.IsSuccessStatusCode)
             {
-                region = locationNode.TryGetProperty("region1", out var regionProp) ? regionProp.GetString() : null;
-
-                string? countryCode = locationNode.TryGetProperty("country1", out var countryProp) ? countryProp.GetString() : null;
-                country = CountryMapper.GetName(countryCode);
-
-                city = locationNode.TryGetProperty("city1", out var cityProp) ? cityProp.GetString() : null;
+                // a partial list would be cached for 24 hours, so a failed page returns nothing
+                _logger.LogError($"Fetching events failed: {response.StatusCode} - {response.ReasonPhrase}");
+                return new List<Event>();
             }
 
-            Event ev = new()
+            var data = await response.Content.ReadAsStringAsync();
+            using JsonDocument json = JsonDocument.Parse(data);
+            //JsonTools.LogJson(json);
+
+            var resultNode = json.RootElement.GetProperty("result");
+            int count = 0;
+
+            foreach (var element in resultNode.EnumerateArray())
             {
-                EventId = element.GetProperty("pageid").GetInt32(),
-                EventName = element.GetProperty("name").GetString()!,
-                EventRelUrl = element.GetProperty("pagename").GetString()!,
+                count++;
 
-                StartDate = element.TryGetProperty("startdate", out var sdProp) && DateTime.TryParse(sdProp.GetString(), out var sd) ? sd : null,
-                EndDate = element.TryGetProperty("enddate", out var edProp) && DateTime.TryParse(edProp.GetString(), out var ed) ? ed : null,
+                // fallback for other spellings ("canceled") the condition does not catch
+                if (IsCanceled(element))
+                    continue;
 
-                Environment = element.GetProperty("type").GetString()!,
+                events.Add(ParseEvent(element));
+            }
 
-                Tier = (EventTier)tier,
-                LpTier = lpTier,
-                ValveTier = valveTier,
-
-                PrizePool = element.TryGetProperty("prizepool", out var ppProp) && ppProp.ValueKind == JsonValueKind.Number ? ppProp.GetDouble() : null,
-                TeamsAttending = element.TryGetProperty("participantsnumber", out var partProp) && partProp.TryGetInt32(out var count) && count > 0 ? count : null,
-
-                Region = region,
-                Country = country,
-                City = city
-            };
-
-            events.Add(ev);
+            if (count < EventsPageSize)
+                break;
         }
 
         return events;
+    }
+
+    private static bool IsCanceled(JsonElement element)
+    {
+        return element.TryGetProperty("status", out var statusNode)
+            && statusNode.ValueKind == JsonValueKind.String
+            && statusNode.GetString()!.Contains("cancel", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Event ParseEvent(JsonElement element)
+    {
+        string lpTier = element.GetProperty("liquipediatier").GetString()!;
+        string valveTier = element.GetProperty("publishertier").GetString()!;
+        // with the longer horizon more misc events show up, a non numeric tier must not break the whole fetch (-1 is not part of the enum)
+        int tier = valveTier == "Major Championship" ? 0 : (int.TryParse(lpTier, out int parsedTier) ? parsedTier : -1);
+
+        var locationNode = element.GetProperty("locations");
+        string? region = null;
+        string? country = null;
+        string? city = null;
+
+        if (locationNode.ValueKind != JsonValueKind.Array)
+        {
+            region = locationNode.TryGetProperty("region1", out var regionProp) ? regionProp.GetString() : null;
+
+            string? countryCode = locationNode.TryGetProperty("country1", out var countryProp) ? countryProp.GetString() : null;
+            country = CountryMapper.GetName(countryCode);
+
+            city = locationNode.TryGetProperty("city1", out var cityProp) ? cityProp.GetString() : null;
+        }
+
+        return new Event()
+        {
+            EventId = element.GetProperty("pageid").GetInt32(),
+            EventName = element.GetProperty("name").GetString()!,
+            EventRelUrl = element.GetProperty("pagename").GetString()!,
+
+            StartDate = element.TryGetProperty("startdate", out var sdProp) && DateTime.TryParse(sdProp.GetString(), out var sd) ? sd : null,
+            EndDate = element.TryGetProperty("enddate", out var edProp) && DateTime.TryParse(edProp.GetString(), out var ed) ? ed : null,
+
+            Environment = element.GetProperty("type").GetString()!,
+
+            Tier = (EventTier)tier,
+            LpTier = lpTier,
+            ValveTier = valveTier,
+
+            PrizePool = element.TryGetProperty("prizepool", out var ppProp) && ppProp.ValueKind == JsonValueKind.Number ? ppProp.GetDouble() : null,
+            TeamsAttending = element.TryGetProperty("participantsnumber", out var partProp) && partProp.TryGetInt32(out var count) && count > 0 ? count : null,
+
+            Region = region,
+            Country = country,
+            City = city
+        };
     }
 
     private async Task<List<Team>> FetchTeamsAsync()
