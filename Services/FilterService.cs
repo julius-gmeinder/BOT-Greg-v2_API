@@ -44,13 +44,19 @@ public class FilterService
         return matchingFilters.Count > 0 ? matchingFilters : null;
     }
 
-    // events only have a name and a tier, the other filter properties are ignored
+    // events only have a name and a tier, so only filters with an event or an event tier apply to events
+    // filters with only match properties (team, vrs rank, hltv coverage) are skipped, otherwise they would let every event pass
     public bool EventPassesFilters(Guild guild, Event ev)
     {
-        if (guild.Filters.Count == 0)
+        var eventFilters = guild.Filters
+            .Where(filter => filter.Event != null || filter.EventTier != null)
+            .ToList();
+
+        // no filter applies to events, so every event passes
+        if (eventFilters.Count == 0)
             return true;
 
-        return guild.Filters.Any(filter => EventPassesFilter(ev, filter));
+        return eventFilters.Any(filter => EventPassesFilter(ev, filter));
     }
 
     // a filter property that is null means "dont care", all other properties have to fit the match

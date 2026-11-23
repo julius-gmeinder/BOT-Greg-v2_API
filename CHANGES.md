@@ -446,7 +446,7 @@ Filters work like in the alerts: any filter that passes is enough, a guild witho
 
 - `Event[]` (same objects as `api/Liquipedia/events`), sorted: ongoing events first, then by `startDate` ascending (no start date last).
 - Search fields: `eventName`, `tierString`, `locationString`.
-- Events only know their name and tier, so only `event` and `eventTier` of a filter count. `team`, `vrsRank` and `hltvCoverage` are ignored. An event passes a filter if (`event` is null or equals `eventName`, case insensitive) and (`eventTier` is null or the tier of the event is a valid tier that is `<=` the filter tier). Events with a tier outside of the tier list never pass a filter with a tier.
+- Events only know their name and tier, so only filters with an `event` or an `eventTier` apply to events. Filters with only `team`, `vrsRank` and / or `hltvCoverage` (like the default filter) are skipped. If none of the guild's filters applies to events, every event is returned. An event passes a filter if (`event` is null or equals `eventName`, case insensitive) and (`eventTier` is null or the tier of the event is a valid tier that is `<=` the filter tier). Events with a tier outside of the tier list never pass a filter with a tier.
 - New property `isOngoing` (bool): `startDate` is today or earlier and `endDate` is today or later (or null).
 - The event list (also used by `api/Liquipedia/events` and `api/Autocomplete/events`) now contains the events of the next 6 months (was: the first 100 events, no upper bound).
 
